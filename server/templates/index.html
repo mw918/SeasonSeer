@@ -8,30 +8,58 @@
 <style>
 table, th, td {
     border: 10px solid black;
-  }
+ }
+.column {
+  float: left;
+  width: 50%;
+  flex: 50%;
+}
+
+.row:after {
+  content: "";
+  display: flex;
+  clear: both;
+}
 </style>
 </head>
 <body>
 <script src="../apiInterface.py"></script>
 <h1>Stats</h1>
 <form action="/my-link/" target="_blank">
-  <label for="goals">Goals</label><br>
-  <input type="text" id="goals" name="goals" value="3.0"><br><br>
-  <label for="assists">Assists</label><br>
-  <input type="text" id="assists" name="assists" value="2.0"><br><br>
-  <label for="pim">Penalty Minutes</label><br>
-  <input type="text" id="pim" name="pim" value="-0.5"><br><br>
-  <label for="ppp">Powerplay Points</label><br>
-  <input type="text" id="ppp" name="ppp" value="1.0"><br><br>
-  <label for="shp">Shorthanded points</label><br>
-  <input type="text" id="shp" name="shp" value="1.0"><br><br>
-  <label for="sog">Shots on Goal</label><br>
-  <input type="text" id="sog" name="sog" value="0.5"><br><br>
-  <label for="hit">Hits</label><br>
-  <input type="text" id="hit" name="hit" value="0.5"><br><br>
-  <label for="blk">Blocks</label><br>
-  <input type="text" id="blk" name="blk" value="0.5"><br><br>
-  <br> 
-  <input type="submit" value="Calculate Last Season's Results">
+<div class="row">
+    <div class="column">
+        <h2>Skaters</h2>
+        <label for="goals">Goals</label><br>
+        <input type="text" id="goals" name="goals" value="3.0"><br><br>
+        <label for="assists">Assists</label><br>
+        <input type="text" id="assists" name="assists" value="2.0"><br><br>
+        <label for="pim">Penalty Minutes</label><br>
+        <input type="text" id="pim" name="pim" value="-0.5"><br><br>
+        <label for="ppp">Powerplay Points</label><br>
+        <input type="text" id="ppp" name="ppp" value="1.0"><br><br>
+        <label for="shp">Shorthanded points</label><br>
+        <input type="text" id="shp" name="shp" value="1.0"><br><br>
+        <label for="sog">Shots on Goal</label><br>
+        <input type="text" id="sog" name="sog" value="0.5"><br><br>
+        <label for="hit">Hits</label><br>
+        <input type="text" id="hit" name="hit" value="0.5"><br><br>
+        <label for="blk">Blocks</label><br>
+        <input type="text" id="blk" name="blk" value="0.5"><br><br>
+        <br> 
+    </div>
+    <div class="column">
+        <h2>Goalies</h2>
+        <label for="win">Wins</label><br>
+        <input type="text" id="win" name="win" value="2.0"><br><br>
+        <label for="ga">Goals Against</label><br>
+        <input type="text" id="ga" name="ga" value="-1.0"><br><br>
+        <label for="save">Saves</label><br>
+        <input type="text" id="save" name="save" value="0.3"><br><br>
+        <label for="so">Shutouts</label><br>
+        <input type="text" id="so" name="so" value="3.0"><br><br>
+        <br> 
+    </div>
+</div>
+<input type="submit" value="Calculate Last Season's Results">
 </form>
 </html>
