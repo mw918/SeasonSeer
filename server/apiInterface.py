@@ -46,7 +46,9 @@ def get_player_stats(player):
         hit = request.args.get('hit', type = float) * playerStats["hits"]
         blk = request.args.get('blk', type = float) * playerStats["blocked"]
         fantasyScore = goals + assists + pim + ppp + shp + sog + hit + blk
+        pointsPerGame = fantasyScore/playerStats["games"]
         currentPlayer.append(str(fantasyScore))
+        currentPlayer.append(str(pointsPerGame))
         currentPlayer.append(str(playerStats["games"]))
         currentPlayer.append(str(playerStats["goals"]))
         currentPlayer.append(str(playerStats["assists"]))
@@ -101,7 +103,7 @@ def get_all_players():
       except IndexError:
         print("No stats for "+i["person"]["fullName"])
   print ("Begin sorting...")
-  all_players.sort(reverse=True, key=lambda x: float(x[3]))
+  all_players.sort(reverse=True, key=lambda x: float(x[4]))
   return all_players
 
 def return_players_last_season():
@@ -110,12 +112,12 @@ def return_players_last_season():
   allPlayers = get_all_players()
   returnString = "<style>table, th, td {border: 2px solid powderblue;}</style>"
   returnString = returnString + '<table style="float:center"><caption>Most fantasy points last season</caption>'
-  returnString = returnString + "<tr><th>Name</th><th>Number</th><th>Position</th><th>Fantasy Score</th></tr>"
+  returnString = returnString + "<tr><th>Name</th><th>Number</th><th>Position</th><th>Fantasy Score</th><th>Fantasy Score Per Game</th><th>Games Played</th></tr>"
   #<th>GP</th><th>Goals</th><th>Assists</th><th>Points</th><th>PIM</th><th>PPP</th><th>SHP</th><th>SOG</th><th>HIT</th><th>BLK</th></tr>
   #This goes through the entire list of players
   #i is an array of a player and their stats
   for i in allPlayers:
-    returnString = returnString +'<td>'+str(i[0]) +'</td>' +'<td>'+str(i[1]) +'</td>' +'<td>'+str(i[2]) +'</td>' +'<td>'+str(i[3]) +'</td></tr>'
+    returnString = returnString +'<td>'+str(i[0]) +'</td>' +'<td>'+str(i[1]) +'</td>' +'<td>'+str(i[2]) +'</td>' +'<td>'+str(i[3]) +'</td>' +'<td>'+str(i[4]) +'</td>'+'<td>'+str(i[5]) +'</td></tr>'
   returnString = returnString+"</table>"
   endTime = time.perf_counter()
   print("App ran in "+str(endTime-startTime)+" seconds")
