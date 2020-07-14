@@ -14,7 +14,16 @@ table, th, td {
   width: 50%;
   flex: 50%;
 }
-
+h1 {
+  color: blue;
+  font-family: verdana;
+  font-size: 300%;
+}
+h2 {
+  color: rgb(119, 119, 212);
+  font-family: verdana;
+  font-size: 100%;
+}
 .row:after {
   content: "";
   display: flex;
@@ -24,11 +33,12 @@ table, th, td {
 </head>
 <body>
 <script src="../apiInterface.py"></script>
-<h1>Stats</h1>
+<h1>Season Seer</h1>
+<h2>Look forward to your next fantasy season!</h2>
 <form action="/my-link/" target="_blank">
 <div class="row">
     <div class="column">
-        <h2>Skaters</h2>
+        <h3>Skaters</h3>
         <label for="goals">Goals</label><br>
         <input type="text" id="goals" name="goals" value="3.0"><br><br>
         <label for="assists">Assists</label><br>
@@ -48,7 +58,7 @@ table, th, td {
         <br> 
     </div>
     <div class="column">
-        <h2>Goalies</h2>
+        <h3>Goalies</h3>
         <label for="win">Wins</label><br>
         <input type="text" id="win" name="win" value="2.0"><br><br>
         <label for="ga">Goals Against</label><br>
@@ -67,6 +77,11 @@ table, th, td {
             <option value="right">Right Wings</option>
             <option value="defense">Defensemen</option>
             <option value="goalie">Goaltenders</option>
+          </select>
+          <h3>Sort By</h3>
+        <select id="sort" name="sort">
+            <option value="total">Total points</option>
+            <option value="game">Points per game</option>
           </select>
     </div>
 </div>

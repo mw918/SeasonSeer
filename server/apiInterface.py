@@ -11,6 +11,7 @@ def get_teams():
   data = response.json()
   return data["teams"]
 
+#player is the part of the JSON that comes from the 'roster' section of the team
 def get_player_stats(player):
     currentPlayer = list()
     try:
@@ -20,7 +21,7 @@ def get_player_stats(player):
       playerData = playerResponse.json()
       #This variable is the list of all stats for one player
       playerStats = playerData['stats'][0]['splits'][0]['stat']
-      currentPlayer.append(player["person"]["fullName"])
+      currentPlayer.append('<a href="https://www.nhl.com/player/'+str(player["person"]["id"])+'"target="_blank">'+player["person"]["fullName"]+'</a>')
       currentPlayer.append(player["jerseyNumber"])
       currentPlayer.append(player["position"]["abbreviation"])
       #Goalie stats
@@ -30,7 +31,10 @@ def get_player_stats(player):
         save = request.args.get('save', type = float) * playerStats["saves"]
         shutout = request.args.get('so', type = float) * playerStats["shutouts"]
         fantasyScore = round(win + ga + save + shutout, 1)
+        pointsPerGame = fantasyScore/playerStats["games"]
         currentPlayer.append(str(fantasyScore))
+        currentPlayer.append(str(pointsPerGame))
+        currentPlayer.append(str(playerStats["games"]))
         currentPlayer.append(str(playerStats["wins"]))
         currentPlayer.append(str(playerStats["goalsAgainst"]))
         currentPlayer.append(str(playerStats["saves"]))
@@ -103,24 +107,53 @@ def get_all_players():
       except IndexError:
         print("No stats for "+i["person"]["fullName"])
   print ("Begin sorting...")
-  all_players.sort(reverse=True, key=lambda x: float(x[4]))
+  if request.args.get('sort', type = str)=="total":
+    all_players.sort(reverse=True, key=lambda x: float(x[3]))
+  elif request.args.get('sort', type = str)=="game":
+    all_players.sort(reverse=True, key=lambda x: float(x[4]))
   return all_players
 
 def return_players_last_season():
   startTime = time.perf_counter()
   print("Begin printing...")
   allPlayers = get_all_players()
+  counter = 0
+  headerString = "<tr><th>Rank</th><th>Name</th><th>Number</th><th>Position</th><th>Fantasy Score</th><th>Fantasy Score Per Game</th><th>GP</th>"
   returnString = "<style>table, th, td {border: 2px solid powderblue;}</style>"
-  returnString = returnString + '<table style="float:center"><caption>Most fantasy points last season</caption>'
-  returnString = returnString + "<tr><th>Name</th><th>Number</th><th>Position</th><th>Fantasy Score</th><th>Fantasy Score Per Game</th><th>Games Played</th></tr>"
+  returnString = returnString + '<table style="float:center"><h1>Most fantasy points last season in '+request.args.get('sort', type = str)+'</h2>'
+  if request.args.get('positions', type = str)=="goalie":
+    headerString = headerString + "<th>Wins</th><th>Goals Against</th><th>Saves</th><th>Shutouts</th></tr>"
+  else:
+    headerString = headerString + "<th>Goals</th><th>Assists</th><th>Points</th><th>PIM</th><th>PPP</th><th>SHP</th><th>SOG</th><th>HIT</th><th>BLK</th></tr>"
   #<th>GP</th><th>Goals</th><th>Assists</th><th>Points</th><th>PIM</th><th>PPP</th><th>SHP</th><th>SOG</th><th>HIT</th><th>BLK</th></tr>
+  returnString = returnString + headerString
   #This goes through the entire list of players
   #i is an array of a player and their stats
   for i in allPlayers:
-    returnString = returnString +'<td>'+str(i[0]) +'</td>' +'<td>'+str(i[1]) +'</td>' +'<td>'+str(i[2]) +'</td>' +'<td>'+str(i[3]) +'</td>' +'<td>'+str(i[4]) +'</td>'+'<td>'+str(i[5]) +'</td></tr>'
+    counter+=1
+    if counter%20==0:
+      returnString = returnString + headerString
+    try:
+      returnString = returnString +'<td>'+ str(counter) +'</td>'
+      #Goalie stats
+      if (i[2]=='G'):
+        if request.args.get('positions', type = str)=="goalie":
+          for j in i:
+            returnString = returnString +'<td>'+ j +'</td>'
+        else:
+          for j in range(6):
+            returnString = returnString + '<td>'+ i[j] + '</td>'
+        #Skater stats
+      else:
+        for j in i:
+          returnString = returnString +'<td>'+ j +'</td>'
+      returnString = returnString + '</tr>'
+    #This only happens for players who are on the roster, but haven't played any games
+    except IndexError:
+      print("No stats for "+i[0])
   returnString = returnString+"</table>"
   endTime = time.perf_counter()
-  print("App ran in "+str(endTime-startTime)+" seconds")
+  print("App ran in "+str(endTime-startTime)+" seconds. "+str(counter)+" players counted.")
   return returnString
 
 def return_teams():
@@ -167,7 +200,7 @@ def return_teams():
     print("Writing goalie stats")
     rosterString = rosterString+goalieString+"</table>"
     endTime = time.perf_counter()
-    print("App ran in "+str(endTime-startTime)+" seconds")
+    print("App ran in "+str(endTime-startTime)+" seconds.")
     return rosterString
 
 @app.route('/')
