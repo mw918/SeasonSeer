@@ -11,19 +11,56 @@ def get_teams():
   data = response.json()
   return data["teams"]
 
+def get_categories():
+  #The list of every category that can be turned on or off
+  categories = list()
+  
+  categories.append("showCharjerseyNumber")
+  categories.append("showCharposition")
+  categories.append("showCharcurrentTeam")
+
+  categories.append("InTotal")
+  categories.append("PerGame")
+
+  if request.args.get('positions', type = str)=="goalie":
+    categories.append("showGoaliegames")
+    categories.append("showGoaliewins")
+    categories.append("showGoaliegoalsAgainst")
+    categories.append("showGoaliesaves")
+    categories.append("showGoalieshutouts")
+  else:
+    categories.append("showgames")
+    categories.append("showgoals")
+    categories.append("showassists")
+    categories.append("showpoints")
+    categories.append("showpim")
+    categories.append("showpowerPlayPoints")
+    categories.append("showshortHandedPoints")
+    categories.append("showshots")
+    categories.append("showhits")
+    categories.append("showblocked")
+
+  for i in categories:
+    #The category has been selected to be displayed by the user
+    if str(request.args.get(i, type = str)) == "None":
+      del(i)
+
+  return (categories)
+
 #player is the part of the JSON that comes from the 'roster' section of the team
-def get_player_stats(player):
+def get_player_stats(player, team):
     currentPlayer = list()
     try:
       currentYear = datetime.datetime.now().year
       player_base = "https://statsapi.web.nhl.com/api/v1/people/"+str(player["person"]["id"])+"/stats?stats=statsSingleSeason&season="+str(currentYear-1)+str(currentYear)
       playerResponse = requests.get(player_base)
       playerData = playerResponse.json()
+      fantasyScore=0
+      pointsPerGame=0
       #This variable is the list of all stats for one player
       playerStats = playerData['stats'][0]['splits'][0]['stat']
       currentPlayer.append('<a href="https://www.nhl.com/player/'+str(player["person"]["id"])+'"target="_blank">'+player["person"]["fullName"]+'</a>')
-      currentPlayer.append(player["jerseyNumber"])
-      currentPlayer.append(player["position"]["abbreviation"])
+
       #Goalie stats
       if (player["position"]["abbreviation"]=='G'):
         win = request.args.get('win', type = float) * playerStats["wins"]
@@ -32,13 +69,6 @@ def get_player_stats(player):
         shutout = request.args.get('so', type = float) * playerStats["shutouts"]
         fantasyScore = round(win + ga + save + shutout, 1)
         pointsPerGame = fantasyScore/playerStats["games"]
-        currentPlayer.append(str(fantasyScore))
-        currentPlayer.append(str(pointsPerGame))
-        currentPlayer.append(str(playerStats["games"]))
-        currentPlayer.append(str(playerStats["wins"]))
-        currentPlayer.append(str(playerStats["goalsAgainst"]))
-        currentPlayer.append(str(playerStats["saves"]))
-        currentPlayer.append(str(playerStats["shutouts"]))
       #Skater stats
       else:
         goals = request.args.get('goals', type = float) * playerStats["goals"]
@@ -51,18 +81,37 @@ def get_player_stats(player):
         blk = request.args.get('blk', type = float) * playerStats["blocked"]
         fantasyScore = goals + assists + pim + ppp + shp + sog + hit + blk
         pointsPerGame = fantasyScore/playerStats["games"]
-        currentPlayer.append(str(fantasyScore))
-        currentPlayer.append(str(pointsPerGame))
-        currentPlayer.append(str(playerStats["games"]))
-        currentPlayer.append(str(playerStats["goals"]))
-        currentPlayer.append(str(playerStats["assists"]))
-        currentPlayer.append(str(playerStats["points"]))
-        currentPlayer.append(str(playerStats["pim"]))
-        currentPlayer.append(str(playerStats["powerPlayPoints"]))
-        currentPlayer.append(str(playerStats["shortHandedPoints"]))
-        currentPlayer.append(str(playerStats["shots"]))
-        currentPlayer.append(str(playerStats["hits"]))
-        currentPlayer.append(str(playerStats["blocked"]))
+      #i is the name as it appears in the JSON, the requested value is the one that'll appear in the column heading
+      for i in global_categories:
+        #The category has been selected to be displayed by the user
+        if str(request.args.get(i, type = str)) != "None":
+          #Player characteristics
+          if i[4:8]=="Char":
+            #Need to check for team name, since it has an additional level
+            if (i[8:len(i)]=="currentTeam"):
+              currentPlayer.append(team)
+            elif (i[8:len(i)]=="position"):
+              currentPlayer.append(str(player["position"]["abbreviation"]))
+            else:
+              currentPlayer.append(str(player[str(i)[8:len(i)]]))
+          #Stats from API (goals, assists, etc.)
+          elif i[0:4]=="show":
+            #Goalie stats only shown if goalies-only is selected
+            if request.args.get('positions', type = str)=="goalie":
+              if i[4:10]=="Goalie":
+                currentPlayer.append(str(playerStats[str(i)[10:len(i)]]))
+            #If something other than goalies are selected
+            else:
+              if i[4:10]!="Goalie" and player["position"]["abbreviation"]!="G":
+                currentPlayer.append(str(playerStats[str(i)[4:len(i)]]))
+          #Calculated categories
+          else:
+            if i=="InTotal":
+              currentPlayer.append(str(fantasyScore))
+            elif i=="PerGame":
+              currentPlayer.append(str(pointsPerGame))
+            else:
+              print("Unrecognized category "+i)
     #This only happens for players who are on the roster, but haven't played any games
     except IndexError:
       print("No stats for "+currentPlayer[0])
@@ -97,35 +146,47 @@ def get_all_players():
     api_url_base = 'https://statsapi.web.nhl.com/api/v1/teams/' + str(x["id"]) + '/roster'
     teamResponse = requests.get(api_url_base)
     teamData = teamResponse.json()
-    print("Writing "+x["name"])
+    print("Writing"+x["name"])
     #i is an array of players and their stats
     for i in teamData["roster"]:
       try:
         if check_viability(i["position"]["abbreviation"]):
-          currentPlayer = get_player_stats(i)
+          currentPlayer = get_player_stats(i, x["name"])
           all_players.append(currentPlayer)
       except IndexError:
         print("No stats for "+i["person"]["fullName"])
   print ("Begin sorting...")
-  if request.args.get('sort', type = str)=="total":
+  #Get the basis from which I'm sorting
+  value = request.args.get('sort', type = str)
+  indexOfValue = global_categories.index(value[4:len(value)])
+  all_players.sort(reverse=True, key=lambda x: float(x[indexOfValue]))
+  '''if request.args.get('sort', type = str)=="total":
     all_players.sort(reverse=True, key=lambda x: float(x[3]))
   elif request.args.get('sort', type = str)=="game":
-    all_players.sort(reverse=True, key=lambda x: float(x[4]))
+    all_players.sort(reverse=True, key=lambda x: float(x[4]))'''
   return all_players
 
 def return_players_last_season():
   startTime = time.perf_counter()
+  counter = 0
   print("Begin printing...")
   allPlayers = get_all_players()
-  counter = 0
-  headerString = "<tr><th>Rank</th><th>Name</th><th>Number</th><th>Position</th><th>Fantasy Score</th><th>Fantasy Score Per Game</th><th>GP</th>"
   returnString = "<style>table, th, td {border: 2px solid powderblue;}</style>"
-  returnString = returnString + '<table style="float:center"><h1>Most fantasy points last season in '+request.args.get('sort', type = str)+'</h2>'
-  if request.args.get('positions', type = str)=="goalie":
-    headerString = headerString + "<th>Wins</th><th>Goals Against</th><th>Saves</th><th>Shutouts</th></tr>"
-  else:
-    headerString = headerString + "<th>Goals</th><th>Assists</th><th>Points</th><th>PIM</th><th>PPP</th><th>SHP</th><th>SOG</th><th>HIT</th><th>BLK</th></tr>"
-  #<th>GP</th><th>Goals</th><th>Assists</th><th>Points</th><th>PIM</th><th>PPP</th><th>SHP</th><th>SOG</th><th>HIT</th><th>BLK</th></tr>
+  returnString = returnString + '<table style="float:center"><h1>Most fantasy points last season by '+request.args.get('positions', type = str)+'</h2>'
+  headerString = "<tr><th>Rank</th><th>Name</th>"
+  #This is to print out all the categories along the top
+  for i in global_categories:
+    #The category has been selected to be displayed by the user
+    if str(request.args.get(i, type = str)) != "None":
+      #Print out all categories relevant to goalies
+      if request.args.get('positions', type = str)=="goalie":
+        if str(i)[4:10]=="Goalie" or str(i)[4:8]=="Char" or str(i)[0:4]!="show":
+          headerString = headerString+"<th>"+str(request.args.get(i, type = str))+"</th>"
+      #Print out all categories relevant to skaters
+      else:
+        if str(i)[4:10]!="Goalie":
+          headerString = headerString+"<th>"+str(request.args.get(i, type = str))+"</th>"
+  headerString = headerString+"</tr>"
   returnString = returnString + headerString
   #This goes through the entire list of players
   #i is an array of a player and their stats
@@ -156,6 +217,7 @@ def return_players_last_season():
   print("App ran in "+str(endTime-startTime)+" seconds. "+str(counter)+" players counted.")
   return returnString
 
+#This section is more or less obsolete
 def return_teams():
     startTime = time.perf_counter()
     teams = get_teams()
@@ -175,7 +237,7 @@ def return_teams():
         #This loop goes through the members of the roster one by one
         for i in teamData["roster"]:
           try:
-            currentPlayer = get_player_stats(i)
+            currentPlayer = get_player_stats(i, x["name"])
             playerSpecs = '<tr><td><a href="https://www.nhl.com/player/'+str(i["person"]["id"])+'"target="_blank">'+currentPlayer[0]+'</a></td>'
             list_iter = iter(currentPlayer)
             next(list_iter)
@@ -207,9 +269,11 @@ def return_teams():
 def index():
   return render_template('index.html')
 
-@app.route('/my-link/')
+@app.route('/calculate-results/')
 def my_link():
   #return return_teams()
+  global global_categories
+  global_categories = get_categories()
   return return_players_last_season()
 
 

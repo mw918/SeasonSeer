@@ -29,13 +29,32 @@ h2 {
   display: flex;
   clear: both;
 }
+ /* The sidenav */
+ .sidenav {
+  height: 100%;
+  width: 200px;
+  position: fixed;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  background-color: rgb(148, 34, 34);
+  overflow-x: hidden;
+  padding-top: 20px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+/* Page content */
+.main {
+  margin-left: 200px; /* Same as the width of the sidenav */
+} 
 </style>
 </head>
 <body>
 <script src="../apiInterface.py"></script>
-<h1>Season Seer</h1>
-<h2>Look forward to your next fantasy season!</h2>
-<form action="/my-link/" target="_blank">
+<h1 style="text-align:center;">Season Seer</h1>
+<h2 style="text-align:center;">Look forward to your next fantasy season!</h2>
+<form action="/calculate-results/" target="_blank" style="text-align:center;">
 <div class="row">
     <div class="column">
         <h3>Skaters</h3>
@@ -67,7 +86,7 @@ h2 {
         <input type="text" id="save" name="save" value="0.3"><br><br>
         <label for="so">Shutouts</label><br>
         <input type="text" id="so" name="so" value="3.0"><br><br>
-        <h3>Positions</h3>
+        <h3>Positions Shown</h3>
         <select id="positions" name="positions">
             <option value="all">All Players</option>
             <option value="skater">Skaters</option>
@@ -80,11 +99,63 @@ h2 {
           </select>
           <h3>Sort By</h3>
         <select id="sort" name="sort">
-            <option value="total">Total points</option>
-            <option value="game">Points per game</option>
+            <option value="sortInTotal">Total points</option>
+            <option value="sortPerGame">Points per game</option>
           </select>
     </div>
 </div>
+ <div id="mySidenav" class="sidenav" style="text-align:left;">
+  <h2 style="text-align:center;">Categories visible in summary</h2>
+
+  <h3>Player Characteristics</h3>
+  <input checked type="checkbox" name="showCharjerseyNumber" value="Number">
+  <label for="showCharjerseyNumber"> Number</label><br>
+  <input checked type="checkbox" name="showCharposition" value="Position">
+  <label for="showCharposition"> Position</label><br>
+  <input checked type="checkbox" name="showCharcurrentTeam" value="Team">
+  <label for="showCharcurrentTeam"> Team Name</label><br> 
+
+  <h3>Fantasy Statistics</h3>
+  <input checked type="checkbox"  name="InTotal" value="Fantasy Points In Total">
+  <label for="InTotal"> Total score</label><br>
+  <input checked type="checkbox" name="PerGame" value="Fantasy Points Per Game">
+  <label for="PerName"> Score per game</label><br>
+
+  <h3>Skater Statistics</h3>
+  <input checked type="checkbox" name="showgames" value="Games Played">
+  <label for="showgames"> Games played</label><br>
+  <input checked type="checkbox" name="showgoals" value="Goals">
+  <label for="showgoals"> Goals</label><br>
+  <input checked type="checkbox" name="showassists" value="Assists">
+  <label for="showassists"> Assists</label><br>
+  <input checked type="checkbox" name="showpoints" value="Points">
+  <label for="showpoints"> Points</label><br>
+  <input checked type="checkbox" name="showpim" value="PIM">
+  <label for="showpim"> Penalty Minutes (PIM)</label><br>
+  <input checked type="checkbox" name="showpowerPlayPoints" value="PPP">
+  <label for="showpowerPlayPoints"> Powerplay points (PPP)</label><br>
+  <input checked type="checkbox" name="showshortHandedPoints" value="SHP">
+  <label for="showshortHandedPoints"> Shorthanded points (SHP)</label><br>
+  <input checked type="checkbox" name="showshots" value="SOG">
+  <label for="showshots"> Shots on goal (SOG)</label><br>
+  <input checked type="checkbox" name="showhits" value="Hits">
+  <label for="showhits"> Hits (HIT)</label><br>
+  <input checked type="checkbox" name="showblocked" value="Blocks">
+  <label for="showblocked"> Blocks (BLK)</label><br>
+
+  <h3>Goalie Statistics</h3>
+  <input checked type="checkbox" name="showGoaliegames" value="Games Played">
+  <label for="showGoaliegames"> Games played</label><br>
+  <input checked type="checkbox" name="showGoaliewins" value="Wins">
+  <label for="showGoaliewins"> Wins</label><br>
+  <input checked type="checkbox" name="showGoaliegoalsAgainst" value="GA">
+  <label for="showGoaliegoalsAgainst"> Goals against</label><br>
+  <input checked type="checkbox" name="showGoaliesaves" value="Saves">
+  <label for="showGoaliesaves"> Saves</label><br>
+  <input checked type="checkbox" name="showGoalieshutouts" value="SO">
+  <label for="showGoalieshutouts"> Shutouts</label><br>
+</div>
+
 <input type="submit" value="Calculate Last Season's Results">
 </form>
 </html>
