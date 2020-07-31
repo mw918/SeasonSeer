@@ -2,11 +2,12 @@ import json
 import requests
 import datetime
 import time
+import os.path
 from flask import Flask, render_template, request
 app = Flask(__name__)
 
 def get_teams():
-  print ('I got clicked!')
+  print ('The URL response is '+request.full_path.split("?")[1])
   response = requests.get('https://statsapi.web.nhl.com/api/v1/teams/')
   data = response.json()
   return data["teams"]
@@ -89,6 +90,7 @@ def check_viability(position):
   elif (allowedPositions=='forward'):
     return (position!='G' and position!='D')
 
+#This function returns a list of all players on each team
 def get_all_players():
   teams = get_teams()
   all_players = list()
@@ -113,14 +115,14 @@ def get_all_players():
     all_players.sort(reverse=True, key=lambda x: float(x[4]))
   return all_players
 
+#This function gets called first, and calls the other functions
 def return_players_last_season():
-  startTime = time.perf_counter()
   print("Begin printing...")
   allPlayers = get_all_players()
   counter = 0
   headerString = "<tr><th>Rank</th><th>Name</th><th>Number</th><th>Position</th><th>Fantasy Score</th><th>Fantasy Score Per Game</th><th>GP</th>"
   returnString = "<style>table, th, td {border: 2px solid powderblue;}</style>"
-  returnString = returnString + '<table style="float:center"><h1>Most fantasy points last season in '+request.args.get('sort', type = str)+'</h2>'
+  returnString = returnString + '<table style="float:center"><h1>Most fantasy points last season in '+request.args.get('sort', type = str)+', '+request.args.get('positions', type = str)+'</h2>'
   if request.args.get('positions', type = str)=="goalie":
     headerString = headerString + "<th>Wins</th><th>Goals Against</th><th>Saves</th><th>Shutouts</th></tr>"
   else:
@@ -152,8 +154,7 @@ def return_players_last_season():
     except IndexError:
       print("No stats for "+i[0])
   returnString = returnString+"</table>"
-  endTime = time.perf_counter()
-  print("App ran in "+str(endTime-startTime)+" seconds. "+str(counter)+" players counted.")
+  print(str(counter)+" players counted.")
   return returnString
 
 def return_teams():
@@ -209,8 +210,23 @@ def index():
 
 @app.route('/my-link/')
 def my_link():
+  startTime = time.perf_counter()
   #return return_teams()
-  return return_players_last_season()
+  fileNameString = "saves/"+request.full_path.split("?")[1]
+  seasonString =""
+  if os.path.isfile(fileNameString):
+    print ("Saved file found")
+    f = open(fileNameString, "r")
+    seasonString = f.read()
+  else: 
+    print("No saved file found. Generating.")
+    seasonString = return_players_last_season()
+    f = open(fileNameString, "w+")
+    f.write(seasonString)
+    f.close() 
+  endTime = time.perf_counter()
+  print("App ran in "+str(endTime-startTime)+" seconds.")
+  return seasonString
 
 
 if __name__ == '__main__':
