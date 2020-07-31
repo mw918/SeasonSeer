@@ -125,6 +125,8 @@ def return_players_last_season():
   returnString = returnString + '<table style="float:center"><h1>Most fantasy points last season in '+request.args.get('sort', type = str)+', '+request.args.get('positions', type = str)+'</h2>'
   if request.args.get('positions', type = str)=="goalie":
     headerString = headerString + "<th>Wins</th><th>Goals Against</th><th>Saves</th><th>Shutouts</th></tr>"
+  elif request.args.get('positions', type = str)=="all":
+    headerString = headerString + "<th>Goals(Wins)</th><th>Assists(GA)</th><th>Points(SV)</th><th>PIM(SO)</th><th>PPP</th><th>SHP</th><th>SOG</th><th>HIT</th><th>BLK</th></tr>"
   else:
     headerString = headerString + "<th>Goals</th><th>Assists</th><th>Points</th><th>PIM</th><th>PPP</th><th>SHP</th><th>SOG</th><th>HIT</th><th>BLK</th></tr>"
   #<th>GP</th><th>Goals</th><th>Assists</th><th>Points</th><th>PIM</th><th>PPP</th><th>SHP</th><th>SOG</th><th>HIT</th><th>BLK</th></tr>
@@ -137,6 +139,9 @@ def return_players_last_season():
       returnString = returnString + headerString
     try:
       returnString = returnString +'<td>'+ str(counter) +'</td>'
+      for j in i:
+          returnString = returnString +'<td>'+ j +'</td>'
+      '''
       #Goalie stats
       if (i[2]=='G'):
         if request.args.get('positions', type = str)=="goalie":
@@ -149,6 +154,7 @@ def return_players_last_season():
       else:
         for j in i:
           returnString = returnString +'<td>'+ j +'</td>'
+          '''
       returnString = returnString + '</tr>'
     #This only happens for players who are on the roster, but haven't played any games
     except IndexError:
@@ -157,6 +163,7 @@ def return_players_last_season():
   print(str(counter)+" players counted.")
   return returnString
 
+#This block of code is basically obsolete
 def return_teams():
     startTime = time.perf_counter()
     teams = get_teams()
@@ -181,6 +188,9 @@ def return_teams():
             list_iter = iter(currentPlayer)
             next(list_iter)
             currentTeam = currentTeam + playerSpecs
+            for j in list_iter:
+                currentTeam = currentTeam +'<td>'+ j +'</td>'
+            '''
             #Goalie stats
             if (i["position"]["abbreviation"]=='G'):
               currentTeam = currentTeam + '<td>'+currentPlayer[1] + '</td><td>'+ currentPlayer[2] + '</td><td>'+ currentPlayer[3] + '</td></tr>'
@@ -191,6 +201,7 @@ def return_teams():
               for j in list_iter:
                 currentTeam = currentTeam +'<td>'+ j +'</td>'
             currentTeam = currentTeam + '</tr>'
+            '''
           #This only happens for players who are on the roster, but haven't played any games
           except IndexError:
             print("No stats for "+i["person"]["fullName"])
@@ -212,7 +223,7 @@ def index():
 def my_link():
   startTime = time.perf_counter()
   #return return_teams()
-  fileNameString = "saves/"+request.full_path.split("?")[1]
+  fileNameString = "saves/"+str(datetime.datetime.now().year)+request.full_path.split("?")[1]
   seasonString =""
   if os.path.isfile(fileNameString):
     print ("Saved file found")
