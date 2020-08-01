@@ -1,0 +1,25 @@
+table {
+  overflow: hidden;
+  border: 2px solid powderblue;
+}
+
+tr:hover {
+  background-color: #ffa;
+}
+
+td, th {
+  border: 2px solid powderblue;
+  position: relative;
+}
+
+td:hover::after,
+th:hover::after {
+  content: "";
+  position: absolute;
+  background-color: #ffa;
+  left: 0;
+  top: -500px;
+  height: 1000px;
+  width: 100%;
+  z-index: -1;
+}

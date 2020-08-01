@@ -148,7 +148,7 @@ def return_players_last_season():
   counter = 0
   #We manually append everything because I tried doing it via queue, and it took up a whole week to implement, and it made it 10x slower anyways
   headerString = "<tr><th>Rank</th><th>Name</th><th>Number</th><th>Position</th><th>Fantasy Score</th><th>Fantasy Score Per Game</th><th>GP</th>"
-  returnString = "<style>table, th, td {border: 2px solid powderblue;}</style>"
+  returnString = "<style>"+getTableProperties()+"</style>"
   returnString = returnString + '<table style="float:center"><h1>Most fantasy points last season in '+request.args.get('sort', type = str)+', '+request.args.get('positions', type = str)+'</h2>'
   if request.args.get('positions', type = str)=="goalie":
     headerString = headerString + "<th>Wins</th><th>Goals Against</th><th>Saves</th><th>Shutouts</th></tr>"
@@ -243,7 +243,6 @@ def return_teams():
 '''
 
 def return_player_data(playerID):
-  print ("Fetching player data")
   currentYear = datetime.datetime.now().year
   returnString = ''
   currentSeasonStats = get_season_scores(playerID, currentYear, True)
@@ -269,15 +268,24 @@ def getToolTip():
   f.close()
   return style
 
+def getTableProperties():
+  f = open("templates/tableStyles.html", "r")
+  style = f.read()
+  f.close()
+  return style
+
 @app.route('/')
 def index():
   return render_template('index.html')
 
 @app.route('/player-page/')
 def player_link():
-  print (request.args.get('fullName', type = str))
-  return "<style>table, th, td {border: 2px solid powderblue;}"+getToolTip()+"</style><table style='float:center'><h1>"+request.args.get('fullName', type = str)+"</h1><tr>"+return_player_data(request.args.get('id', type = str))+"</table>"
-
+  startTime = time.perf_counter()
+  print ("Fetching player data for "+request.args.get('fullName', type = str))
+  playerString = "<style>table, td, th {border: 2px solid powderblue}"+getToolTip()+"</style><table style='float:center'><h1>"+'<a href="https://www.nhl.com/player/'+str(request.args.get('id', type = str))+'"target="_blank">'+request.args.get('fullName', type = str)+'</a>'+"</h1><br><br><br><tr>"+return_player_data(request.args.get('id', type = str))+"</table>"
+  endTime = time.perf_counter()
+  print("App ran in "+str(endTime-startTime)+" seconds.")
+  return playerString
 
 @app.route('/my-link/')
 def my_link():
