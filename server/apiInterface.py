@@ -20,9 +20,14 @@ def get_player_stats(player):
       player_base = "https://statsapi.web.nhl.com/api/v1/people/"+str(player["person"]["id"])+"/stats?stats=statsSingleSeason&season="+str(currentYear-1)+str(currentYear)
       playerResponse = requests.get(player_base)
       playerData = playerResponse.json()
+      playerCharacteristics = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(player["person"]["id"])).json()
+      playerAge = playerCharacteristics["people"][0]["currentAge"]
+      playerTeam = playerCharacteristics["people"][0]["currentTeam"]["name"]
       #This variable is the list of all stats for one player
       playerStats = playerData['stats'][0]['splits'][0]['stat']
       currentPlayer.append('<a href="https://www.nhl.com/player/'+str(player["person"]["id"])+'"target="_blank">'+player["person"]["fullName"]+'</a>')
+      currentPlayer.append(str(playerAge))
+      currentPlayer.append(playerTeam)
       currentPlayer.append(player["jerseyNumber"])
       currentPlayer.append(player["position"]["abbreviation"])
       #Goalie stats
@@ -110,9 +115,9 @@ def get_all_players():
         print("No stats for "+i["person"]["fullName"])
   print ("Begin sorting...")
   if request.args.get('sort', type = str)=="total":
-    all_players.sort(reverse=True, key=lambda x: float(x[3]))
+    all_players.sort(reverse=True, key=lambda x: float(x[5]))
   elif request.args.get('sort', type = str)=="game":
-    all_players.sort(reverse=True, key=lambda x: float(x[4]))
+    all_players.sort(reverse=True, key=lambda x: float(x[6]))
   return all_players
 
 #This function gets called first, and calls the other functions
@@ -120,7 +125,8 @@ def return_players_last_season():
   print("Begin printing...")
   allPlayers = get_all_players()
   counter = 0
-  headerString = "<tr><th>Rank</th><th>Name</th><th>Number</th><th>Position</th><th>Fantasy Score</th><th>Fantasy Score Per Game</th><th>GP</th>"
+  #We hard-code all the categories, cuz it runs faster than if we have selectable categories
+  headerString = "<tr><th>Rank</th><th>Name</th><th>Age</th><th>Team</th><th>Number</th><th>Position</th><th>Fantasy Score</th><th>Fantasy Score Per Game</th><th>GP</th>"
   returnString = "<style>table, th, td {border: 2px solid powderblue;}</style>"
   returnString = returnString + '<table style="float:center"><h1>Most fantasy points last season in '+request.args.get('sort', type = str)+', '+request.args.get('positions', type = str)+'</h2>'
   if request.args.get('positions', type = str)=="goalie":
@@ -129,7 +135,6 @@ def return_players_last_season():
     headerString = headerString + "<th>Goals(Wins)</th><th>Assists(GA)</th><th>Points(SV)</th><th>PIM(SO)</th><th>PPP</th><th>SHP</th><th>SOG</th><th>HIT</th><th>BLK</th></tr>"
   else:
     headerString = headerString + "<th>Goals</th><th>Assists</th><th>Points</th><th>PIM</th><th>PPP</th><th>SHP</th><th>SOG</th><th>HIT</th><th>BLK</th></tr>"
-  #<th>GP</th><th>Goals</th><th>Assists</th><th>Points</th><th>PIM</th><th>PPP</th><th>SHP</th><th>SOG</th><th>HIT</th><th>BLK</th></tr>
   returnString = returnString + headerString
   #This goes through the entire list of players
   #i is an array of a player and their stats
@@ -139,8 +144,6 @@ def return_players_last_season():
       returnString = returnString + headerString
     try:
       returnString = returnString +'<td>'+ str(counter) +'</td>'
-      for j in i:
-          returnString = returnString +'<td>'+ j +'</td>'
       '''
       #Goalie stats
       if (i[2]=='G'):
@@ -148,13 +151,15 @@ def return_players_last_season():
           for j in i:
             returnString = returnString +'<td>'+ j +'</td>'
         else:
-          for j in range(6):
+          for j in range(10):
             returnString = returnString + '<td>'+ i[j] + '</td>'
         #Skater stats
       else:
         for j in i:
-          returnString = returnString +'<td>'+ j +'</td>'
-          '''
+          returnString = returnString +'<td>'+ str(j) +'</td>'
+      '''
+      for j in i:
+          returnString = returnString +'<td>'+ str(j) +'</td>'
       returnString = returnString + '</tr>'
     #This only happens for players who are on the roster, but haven't played any games
     except IndexError:
@@ -164,6 +169,7 @@ def return_players_last_season():
   return returnString
 
 #This block of code is basically obsolete
+'''
 def return_teams():
     startTime = time.perf_counter()
     teams = get_teams()
@@ -190,7 +196,6 @@ def return_teams():
             currentTeam = currentTeam + playerSpecs
             for j in list_iter:
                 currentTeam = currentTeam +'<td>'+ j +'</td>'
-            '''
             #Goalie stats
             if (i["position"]["abbreviation"]=='G'):
               currentTeam = currentTeam + '<td>'+currentPlayer[1] + '</td><td>'+ currentPlayer[2] + '</td><td>'+ currentPlayer[3] + '</td></tr>'
@@ -201,7 +206,6 @@ def return_teams():
               for j in list_iter:
                 currentTeam = currentTeam +'<td>'+ j +'</td>'
             currentTeam = currentTeam + '</tr>'
-            '''
           #This only happens for players who are on the roster, but haven't played any games
           except IndexError:
             print("No stats for "+i["person"]["fullName"])
@@ -214,6 +218,7 @@ def return_teams():
     endTime = time.perf_counter()
     print("App ran in "+str(endTime-startTime)+" seconds.")
     return rosterString
+'''
 
 @app.route('/')
 def index():
