@@ -16,7 +16,6 @@ def get_teams():
 #This function returns all data for a player in one given season
 def get_season_scores(playerID, season, getHeader):
   currentSeason = list()
-  print ("The season I got was "+str(season))
   remove_lower = lambda text: re.sub('[a-z]', '', text)
   if getHeader:
     currentSeason.append("Season")
@@ -28,7 +27,8 @@ def get_season_scores(playerID, season, getHeader):
     for i in playerStats:
       if (getHeader):
         if (not i.islower()):
-          currentSeason.append((i[0]+remove_lower(i)).upper())
+          #currentSeason.append((i[0]+remove_lower(i)).upper())
+           currentSeason.append('<div class="tooltip">'+(i[0]+remove_lower(i)).upper()+'<span class="tooltiptext">'+re.sub(r"(?<=\w)([A-Z])", r" \1", i).capitalize()+'</span></div>')
         else:
           currentSeason.append(i)
       else:
@@ -253,7 +253,7 @@ def return_player_data(playerID):
   while currentSeasonStats[1] != "No stats for "+str(currentYear-1)+"-"+str(currentYear):
     #print ("Getting data for "+str(currentYear-1)+"-"+str(currentYear))
     #print ("The value for currentSeasonStats[1] is "+currentSeasonStats[1])
-    print ("The season I passed was "+str(currentYear))
+    print ("Generating stats for "+str(currentYear))
     returnString = returnString + '<tr>'
     for j in currentSeasonStats:
       returnString = returnString +'<td>'+ str(j) +'</td>'
@@ -262,6 +262,13 @@ def return_player_data(playerID):
     currentSeasonStats = get_season_scores(playerID, currentYear, False)
   return returnString
 
+#This function is to get the results for when you hover over an abbreviated category
+def getToolTip():
+  f = open("templates/tooltipStyle.html", "r")
+  style = f.read()
+  f.close()
+  return style
+
 @app.route('/')
 def index():
   return render_template('index.html')
@@ -269,7 +276,7 @@ def index():
 @app.route('/player-page/')
 def player_link():
   print (request.args.get('fullName', type = str))
-  return "<style>table, th, td {border: 2px solid powderblue;}</style><table style='float:center'><h1>"+request.args.get('fullName', type = str)+"</h1><tr>"+return_player_data(request.args.get('id', type = str))+"</table>"
+  return "<style>table, th, td {border: 2px solid powderblue;}"+getToolTip()+"</style><table style='float:center'><h1>"+request.args.get('fullName', type = str)+"</h1><tr>"+return_player_data(request.args.get('id', type = str))+"</table>"
 
 
 @app.route('/my-link/')
@@ -283,6 +290,7 @@ def my_link():
     print ("Saved file found")
     f = open(fileNameString, "r")
     seasonString = f.read()
+    f.close()
   else: 
     print("No saved file found. Generating.")
     seasonString = return_players_last_season()
