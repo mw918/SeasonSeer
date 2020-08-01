@@ -3,6 +3,7 @@ import requests
 import datetime
 import time
 import os.path
+import re
 from flask import Flask, render_template, request
 app = Flask(__name__)
 
@@ -11,6 +12,30 @@ def get_teams():
   response = requests.get('https://statsapi.web.nhl.com/api/v1/teams/')
   data = response.json()
   return data["teams"]
+
+#This function returns all data for a player in one given season
+def get_season_scores(playerID, season, getHeader):
+  currentSeason = list()
+  remove_lower = lambda text: re.sub('[a-z]', '', text)
+  if getHeader:
+    currentSeason.append("Season")
+  else:
+    currentSeason.append(str(season-1)+"-"+str(season))
+  try:
+    playerData = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)+"/stats?stats=statsSingleSeason&season="+str(season-1)+str(season)).json()
+    playerStats = playerData['stats'][0]['splits'][0]['stat']
+    for i in playerStats:
+      if (getHeader):
+        if (not i.islower()):
+          #currentSeason.append((i[0]+remove_lower(i)).upper())
+           currentSeason.append('<div class="tooltip">'+(i[0]+remove_lower(i)).upper()+'<span class="tooltiptext">'+re.sub(r"(?<=\w)([A-Z])", r" \1", i).capitalize()+'</span></div>')
+        else:
+          currentSeason.append(i)
+      else:
+        currentSeason.append(playerStats[i])
+  except IndexError:
+    currentSeason.append("No stats for "+str(season-1)+"-"+str(season))
+  return currentSeason
 
 #player is the part of the JSON that comes from the 'roster' section of the team
 def get_player_stats(player):
@@ -22,7 +47,8 @@ def get_player_stats(player):
       playerData = playerResponse.json()
       #This variable is the list of all stats for one player
       playerStats = playerData['stats'][0]['splits'][0]['stat']
-      currentPlayer.append('<a href="https://www.nhl.com/player/'+str(player["person"]["id"])+'"target="_blank">'+player["person"]["fullName"]+'</a>')
+      #currentPlayer.append('<a href="https://www.nhl.com/player/'+str(player["person"]["id"])+'"target="_blank">'+player["person"]["fullName"]+'</a>')
+      currentPlayer.append('<a href="'+'/player-page/?fullName='+player["person"]["fullName"]+'&id='+str(player["person"]["id"])+' "target="_blank">'+player["person"]["fullName"]+'</a>')
       currentPlayer.append(player["jerseyNumber"])
       currentPlayer.append(player["position"]["abbreviation"])
       #Goalie stats
@@ -120,6 +146,7 @@ def return_players_last_season():
   print("Begin printing...")
   allPlayers = get_all_players()
   counter = 0
+  #We manually append everything because I tried doing it via queue, and it took up a whole week to implement, and it made it 10x slower anyways
   headerString = "<tr><th>Rank</th><th>Name</th><th>Number</th><th>Position</th><th>Fantasy Score</th><th>Fantasy Score Per Game</th><th>GP</th>"
   returnString = "<style>table, th, td {border: 2px solid powderblue;}</style>"
   returnString = returnString + '<table style="float:center"><h1>Most fantasy points last season in '+request.args.get('sort', type = str)+', '+request.args.get('positions', type = str)+'</h2>'
@@ -163,6 +190,7 @@ def return_players_last_season():
   print(str(counter)+" players counted.")
   return returnString
 
+'''
 #This block of code is basically obsolete
 def return_teams():
     startTime = time.perf_counter()
@@ -190,7 +218,6 @@ def return_teams():
             currentTeam = currentTeam + playerSpecs
             for j in list_iter:
                 currentTeam = currentTeam +'<td>'+ j +'</td>'
-            '''
             #Goalie stats
             if (i["position"]["abbreviation"]=='G'):
               currentTeam = currentTeam + '<td>'+currentPlayer[1] + '</td><td>'+ currentPlayer[2] + '</td><td>'+ currentPlayer[3] + '</td></tr>'
@@ -201,7 +228,6 @@ def return_teams():
               for j in list_iter:
                 currentTeam = currentTeam +'<td>'+ j +'</td>'
             currentTeam = currentTeam + '</tr>'
-            '''
           #This only happens for players who are on the roster, but haven't played any games
           except IndexError:
             print("No stats for "+i["person"]["fullName"])
@@ -214,10 +240,44 @@ def return_teams():
     endTime = time.perf_counter()
     print("App ran in "+str(endTime-startTime)+" seconds.")
     return rosterString
+'''
+
+def return_player_data(playerID):
+  print ("Fetching player data")
+  currentYear = datetime.datetime.now().year
+  returnString = ''
+  currentSeasonStats = get_season_scores(playerID, currentYear, True)
+  for j in currentSeasonStats:
+      returnString = returnString +'<th>'+ str(j) +'</th>'
+  currentSeasonStats = get_season_scores(playerID, currentYear, False)
+  while currentSeasonStats[1] != "No stats for "+str(currentYear-1)+"-"+str(currentYear):
+    #print ("Getting data for "+str(currentYear-1)+"-"+str(currentYear))
+    #print ("The value for currentSeasonStats[1] is "+currentSeasonStats[1])
+    print ("Generating stats for "+str(currentYear))
+    returnString = returnString + '<tr>'
+    for j in currentSeasonStats:
+      returnString = returnString +'<td>'+ str(j) +'</td>'
+    returnString = returnString + '</tr>'
+    currentYear-=1
+    currentSeasonStats = get_season_scores(playerID, currentYear, False)
+  return returnString
+
+#This function is to get the results for when you hover over an abbreviated category
+def getToolTip():
+  f = open("templates/tooltipStyle.html", "r")
+  style = f.read()
+  f.close()
+  return style
 
 @app.route('/')
 def index():
   return render_template('index.html')
+
+@app.route('/player-page/')
+def player_link():
+  print (request.args.get('fullName', type = str))
+  return "<style>table, th, td {border: 2px solid powderblue;}"+getToolTip()+"</style><table style='float:center'><h1>"+request.args.get('fullName', type = str)+"</h1><tr>"+return_player_data(request.args.get('id', type = str))+"</table>"
+
 
 @app.route('/my-link/')
 def my_link():
@@ -225,10 +285,12 @@ def my_link():
   #return return_teams()
   fileNameString = "saves/"+str(datetime.datetime.now().year)+request.full_path.split("?")[1]
   seasonString =""
+  #Load the saved file if it exists, to save time
   if os.path.isfile(fileNameString):
     print ("Saved file found")
     f = open(fileNameString, "r")
     seasonString = f.read()
+    f.close()
   else: 
     print("No saved file found. Generating.")
     seasonString = return_players_last_season()
