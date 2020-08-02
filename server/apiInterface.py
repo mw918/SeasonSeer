@@ -4,6 +4,8 @@ import datetime
 import time
 import os.path
 import re
+import numpy as np
+import matplotlib.pyplot as plt
 from flask import Flask, render_template, request
 app = Flask(__name__)
 
@@ -149,7 +151,7 @@ def return_players_last_season():
   #We manually append everything because I tried doing it via queue, and it took up a whole week to implement, and it made it 10x slower anyways
   headerString = "<tr><th>Rank</th><th>Name</th><th>Number</th><th>Position</th><th>Fantasy Score</th><th>Fantasy Score Per Game</th><th>GP</th>"
   returnString = "<style>"+getTableProperties()+"</style>"
-  returnString = returnString + '<table style="float:center"><h1>Most fantasy points last season in '+request.args.get('sort', type = str)+', '+request.args.get('positions', type = str)+'</h2>'
+  returnString = returnString + '<table align="center" style="float:center"><h1 style="text-align:center;">Most fantasy points last season in '+request.args.get('sort', type = str)+', '+request.args.get('positions', type = str)+'</h2>'
   if request.args.get('positions', type = str)=="goalie":
     headerString = headerString + "<th>Wins</th><th>Goals Against</th><th>Saves</th><th>Shutouts</th></tr>"
   elif request.args.get('positions', type = str)=="all":
@@ -245,11 +247,14 @@ def return_teams():
 def return_player_data(playerID):
   currentYear = datetime.datetime.now().year
   returnString = ''
+  playerCharacteristics = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)).json()
+  #The player's current age
+  playerAge = playerCharacteristics["people"][0]["currentAge"]
   currentSeasonStats = get_season_scores(playerID, currentYear, True)
   for j in currentSeasonStats:
       returnString = returnString +'<th>'+ str(j) +'</th>'
   currentSeasonStats = get_season_scores(playerID, currentYear, False)
-  while currentSeasonStats[1] != "No stats for "+str(currentYear-1)+"-"+str(currentYear):
+  while playerAge>=18:
     #print ("Getting data for "+str(currentYear-1)+"-"+str(currentYear))
     #print ("The value for currentSeasonStats[1] is "+currentSeasonStats[1])
     print ("Generating stats for "+str(currentYear))
@@ -258,6 +263,7 @@ def return_player_data(playerID):
       returnString = returnString +'<td>'+ str(j) +'</td>'
     returnString = returnString + '</tr>'
     currentYear-=1
+    playerAge-=1
     currentSeasonStats = get_season_scores(playerID, currentYear, False)
   return returnString
 
@@ -282,7 +288,10 @@ def index():
 def player_link():
   startTime = time.perf_counter()
   print ("Fetching player data for "+request.args.get('fullName', type = str))
-  playerString = "<style>table, td, th {border: 2px solid powderblue}"+getToolTip()+"</style><table style='float:center'><h1>"+'<a href="https://www.nhl.com/player/'+str(request.args.get('id', type = str))+'"target="_blank">'+request.args.get('fullName', type = str)+'</a>'+"</h1><br><br><br><tr>"+return_player_data(request.args.get('id', type = str))+"</table>"
+  playerString = "<style>"+getTableProperties()+getToolTip()+"</style><table style='float:center'><h1 style='text-align:center;' >"+'<a href="https://www.nhl.com/player/'+str(request.args.get('id', type = str))+'"target="_blank">'+request.args.get('fullName', type = str)+'</a>'+"</h1><br><br><br><tr>"+return_player_data(request.args.get('id', type = str))+"</table>"
+  #Experimental plotting tool
+  plt.plot([1, 2, 3, 4], [1, 4, 2, 3])
+  plt.savefig('plots/books_read.png')
   endTime = time.perf_counter()
   print("App ran in "+str(endTime-startTime)+" seconds.")
   return playerString
