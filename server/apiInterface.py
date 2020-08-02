@@ -16,13 +16,15 @@ def get_teams():
   return data["teams"]
 
 #This function returns all data for a player in one given season
-def get_season_scores(playerID, season, getHeader):
+def get_season_scores(playerID, age, season, getHeader):
   currentSeason = list()
   remove_lower = lambda text: re.sub('[a-z]', '', text)
   if getHeader:
     currentSeason.append("Season")
+    currentSeason.append("Age")
   else:
     currentSeason.append(str(season-1)+"-"+str(season))
+    currentSeason.append(str(age))
   try:
     playerData = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)+"/stats?stats=statsSingleSeason&season="+str(season-1)+str(season)).json()
     playerStats = playerData['stats'][0]['splits'][0]['stat']
@@ -250,10 +252,10 @@ def return_player_data(playerID):
   playerCharacteristics = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)).json()
   #The player's current age
   playerAge = playerCharacteristics["people"][0]["currentAge"]
-  currentSeasonStats = get_season_scores(playerID, currentYear, True)
+  currentSeasonStats = get_season_scores(playerID, playerAge, currentYear, True)
   for j in currentSeasonStats:
       returnString = returnString +'<th>'+ str(j) +'</th>'
-  currentSeasonStats = get_season_scores(playerID, currentYear, False)
+  currentSeasonStats = get_season_scores(playerID, playerAge, currentYear, False)
   while playerAge>=18:
     #print ("Getting data for "+str(currentYear-1)+"-"+str(currentYear))
     #print ("The value for currentSeasonStats[1] is "+currentSeasonStats[1])
@@ -264,8 +266,13 @@ def return_player_data(playerID):
     returnString = returnString + '</tr>'
     currentYear-=1
     playerAge-=1
-    currentSeasonStats = get_season_scores(playerID, currentYear, False)
+    currentSeasonStats = get_season_scores(playerID, playerAge, currentYear, False)
   return returnString
+
+def makePlot(xAxis, yAxis, perGame):
+  #Experimental plotting tool
+  plt.plot([1, 2, 3, 4], [1, 4, 2, 3])
+  plt.savefig('plots/books_read.png')
 
 #This function is to get the results for when you hover over an abbreviated category
 def getToolTip():
@@ -289,9 +296,6 @@ def player_link():
   startTime = time.perf_counter()
   print ("Fetching player data for "+request.args.get('fullName', type = str))
   playerString = "<style>"+getTableProperties()+getToolTip()+"</style><table style='float:center'><h1 style='text-align:center;' >"+'<a href="https://www.nhl.com/player/'+str(request.args.get('id', type = str))+'"target="_blank">'+request.args.get('fullName', type = str)+'</a>'+"</h1><br><br><br><tr>"+return_player_data(request.args.get('id', type = str))+"</table>"
-  #Experimental plotting tool
-  plt.plot([1, 2, 3, 4], [1, 4, 2, 3])
-  plt.savefig('plots/books_read.png')
   endTime = time.perf_counter()
   print("App ran in "+str(endTime-startTime)+" seconds.")
   return playerString
