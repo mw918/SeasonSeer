@@ -1,0 +1,28 @@
+table {
+  border: 2px solid powderblue;
+}
+/*Alternating coloured rows for readability*/
+tr:nth-child(even) {background: #CCC}
+tr:nth-child(odd) {background: #FFF}
+
+td, th {
+  border: 2px solid powderblue;
+  position: relative;
+}
+
+/*Highlight the row that you're hovering over*/
+tr:hover {
+    background-color: #ffa;
+}
+
+td:hover::after,
+th:hover::after {
+  content: "";
+  position: absolute;
+  background-color: #ffa;
+  left: 0;
+  /*top: -500px;
+  height: 1000px;*/
+  width: 100%;
+  z-index: -1;
+}
