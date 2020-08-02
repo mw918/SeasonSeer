@@ -5,6 +5,8 @@ import time
 import os.path
 import re
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from flask import Flask, render_template, request
 app = Flask(__name__)
@@ -45,21 +47,21 @@ def get_season_scores(playerID, age, season, getHeader):
 def getCategories(playerID):
   currentYear = datetime.datetime.now().year
   playerData = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)+"/stats?stats=statsSingleSeason&season="+str(currentYear-1)+str(currentYear)).json()
-  remove_lower = lambda text: re.sub('[a-z]', '', text)
   playerStats = playerData['stats'][0]['splits'][0]['stat']
   #Top of the string
-  topString = '<form action="/generate-chart/" target="_blank" align="center"><div class="row"><div class="column"><h3>Horizontal axis</h3><select id="horizontal" name="horizontal">'
+  topString = '<form action="/generate-chart/'+playerID+'" target="_blank" align="center"><div class="row"><div class="column"><h3>Horizontal axis</h3><select id="horizontal" name="horizontal">'
   middleString = '</select></div><div class="column"><h3>Vertical axis</h3><select id="vertical" name="vertical">'
-  bottomString = '</select></div></div><br><input type="submit" value="Generate Chart"></form>'
+  bottomString = '</select></div></div><br><input type="checkbox" id="perGame" name="perGame" value="True"><label for="perGame">Generate stats per game</label><br><input type="checkbox" id="sameGraph" name="sameGraph" value="True"><label for="sameGraph">Generate output on same graph</label><br><br><input type="submit" value="Generate Chart"></form>'
   selectionOption = '<option value="season">Season</option><option value="age">Age</option>'
+  verticalOption = ''
   for i in playerStats:
     #These are for the longer categories that need to be changed to acronyms (SHTOI, PPTOIPG, etc)
     if (not i.islower()):
-      selectionOption = selectionOption+'<option value="'+(i[0]+remove_lower(i)).upper()+'">'+re.sub(r"(?<=\w)([A-Z])", r" \1", i).capitalize()+'</option>'
+      verticalOption = verticalOption+'<option value="'+i+'">'+re.sub(r"(?<=\w)([A-Z])", r" \1", i).capitalize()+'</option>'
     #These are the stats that aren't acronyms (Goals, assists, etc.)
     else:
-      selectionOption = selectionOption+'<option value="'+i.capitalize()+'">'+i.capitalize()+'</option>'
-  return topString+selectionOption+middleString+selectionOption+bottomString
+      verticalOption = verticalOption+'<option value="'+i+'">'+i.capitalize()+'</option>'
+  return topString+selectionOption+verticalOption+middleString+verticalOption+bottomString
 
 #player is the part of the JSON that comes from the 'roster' section of the team
 def get_player_stats(player):
@@ -289,10 +291,69 @@ def return_player_data(playerID):
     currentSeasonStats = get_season_scores(playerID, playerAge, currentYear, False)
   return returnString
 
-def makePlot(xAxis, yAxis, perGame):
+@app.route('/generate-chart/<int:playerID>')
+def makePlot(playerID):
+  startTime = time.perf_counter()
+  playerCharacteristics = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)).json()
+  #The player's current age
+  horizontalAxis = list()
+  verticalAxis = list()
+  horizontalInput = str(request.args.get('horizontal', type = str))
+  verticalInput = str(request.args.get('vertical', type = str))
+  playerAge = playerCharacteristics["people"][0]["currentAge"]
+  currentYear = datetime.datetime.now().year
+  while playerAge>=18:
+    try:
+      playerData = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)+"/stats?stats=statsSingleSeason&season="+str(currentYear-1)+str(currentYear)).json()
+      verticalAxis.insert(0, playerData['stats'][0]['splits'][0]['stat'][str(request.args.get('vertical', type = str))])
+      if (str(request.args.get('horizontal', type = str))=='age'):
+        horizontalAxis.insert(0,playerAge)
+      elif (str(request.args.get('horizontal', type = str))=='season'):
+        horizontalAxis.insert(0,"'"+str(currentYear)[2:4])
+      else:
+        horizontalAxis.insert(0,playerData['stats'][0]['splits'][0]['stat'][horizontalInput])
+    except IndexError:
+      print("No stats for "+str(currentYear-1)+"-"+str(currentYear))
+    currentYear-=1
+    playerAge-=1
   #Experimental plotting tool
-  plt.plot([1, 2, 3, 4], [1, 4, 2, 3])
-  plt.savefig('plots/books_read.png')
+  print ("The horizontal array is "+str(horizontalAxis))
+  print ("The vertical array is "+str(verticalAxis))
+  #Setting the plot library
+  perGame = ''
+  if str(request.args.get('perGame', type = str)) == 'True':
+    perGame = 'Per game'
+  else:
+    perGame = 'Total'
+  horizontalTitle = ''
+  verticalTitle = ''
+  #Give the axes proper names
+  if (not horizontalInput.islower()):
+    horizontalTitle = re.sub(r"(?<=\w)([A-Z])", r" \1", horizontalInput).capitalize()
+  else:
+    horizontalTitle =horizontalInput.capitalize()
+  if (not verticalInput.islower()):
+    verticalTitle = re.sub(r"(?<=\w)([A-Z])", r" \1", horizontalInput).capitalize()
+  else:
+    verticalTitle =verticalInput.capitalize()
+  fig, ax = plt.subplots()
+  #ax.scatter(horizontalAxis, verticalAxis, c='#3a34eb', s = 2, label = perGame, alpha=0.5)
+  #plt.scatter(x, y, s=area, c=colors, alpha=0.5)
+  ax.plot(horizontalAxis, verticalAxis, '--bo', label = perGame)
+  ax.set_xlabel(horizontalTitle)
+  ax.set_ylabel(verticalTitle)
+  ax.set_title(playerCharacteristics["people"][0]["fullName"])  # Add a title to the axes.
+  ax.legend()  # Add a legend.
+  #plt.savefig('plots/'+str(playerCharacteristics["people"][0]["fullName"])+"_"+str(request.args.get('vertical', type = str))+"_"+str(request.args.get('horizontal', type = str))+'.png')
+  if str(request.args.get('sameGraph', type = str))=='True':
+    print ("You checked off sameGraph!")
+  if os.path.isfile('plots/currentChart.png') and str(request.args.get('sameGraph', type = str))!='True':
+    print("Deleting your files!")
+    os.remove('plots/currentChart.png') 
+  plt.savefig('plots/currentChart.png')
+  endTime = time.perf_counter()
+  print("Chart generated in "+str(endTime-startTime)+" seconds.")
+  return ' <img src="currentChart.png" alt="Error generating image"> '
 
 #This function is to get the results for when you hover over an abbreviated category
 def getToolTip():
@@ -318,7 +379,7 @@ def player_link():
   playerID = request.args.get('id', type = str)
   playerString = "<style>"+getTableProperties()+getToolTip()+"</style><table style='float:center'><h1 style='text-align:center;' >"+'<a href="https://www.nhl.com/player/'+str(playerID)+'"target="_blank">'+request.args.get('fullName', type = str)+'</a>'+"</h1><br><br><br><tr>"+return_player_data(playerID)+"</table>"+getCategories(playerID)
   endTime = time.perf_counter()
-  print("App ran in "+str(endTime-startTime)+" seconds.")
+  print("Player's stats fetched in "+str(endTime-startTime)+" seconds.")
   return playerString
 
 @app.route('/my-link/')
@@ -340,7 +401,7 @@ def my_link():
     f.write(seasonString)
     f.close() 
   endTime = time.perf_counter()
-  print("App ran in "+str(endTime-startTime)+" seconds.")
+  print("League rankings ran in "+str(endTime-startTime)+" seconds.")
   return seasonString
 
 
