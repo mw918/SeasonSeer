@@ -15,6 +15,22 @@ tr:hover {
     background-color: #ffa;
 }
 
+form {
+    text-align: center;
+  }
+
+.column {
+float: left;
+width: 50%;
+flex: 10%;
+}
+
+.row:after {
+content: "";
+display: flex;
+clear: both;
+}
+
 td:hover::after,
 th:hover::after {
   content: "";
