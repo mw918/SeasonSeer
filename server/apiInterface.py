@@ -34,12 +34,32 @@ def get_season_scores(playerID, age, season, getHeader):
           #currentSeason.append((i[0]+remove_lower(i)).upper())
            currentSeason.append('<div class="tooltip">'+(i[0]+remove_lower(i)).upper()+'<span class="tooltiptext">'+re.sub(r"(?<=\w)([A-Z])", r" \1", i).capitalize()+'</span></div>')
         else:
-          currentSeason.append(i)
+          currentSeason.append(i.capitalize())
       else:
         currentSeason.append(playerStats[i])
   except IndexError:
     currentSeason.append("No stats for "+str(season-1)+"-"+str(season))
   return currentSeason
+
+#This is to generate the options for making the graphs
+def getCategories(playerID):
+  currentYear = datetime.datetime.now().year
+  playerData = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)+"/stats?stats=statsSingleSeason&season="+str(currentYear-1)+str(currentYear)).json()
+  remove_lower = lambda text: re.sub('[a-z]', '', text)
+  playerStats = playerData['stats'][0]['splits'][0]['stat']
+  #Top of the string
+  topString = '<form action="/generate-chart/" target="_blank" align="center"><div class="row"><div class="column"><h3>Horizontal axis</h3><select id="horizontal" name="horizontal">'
+  middleString = '</select></div><div class="column"><h3>Vertical axis</h3><select id="vertical" name="vertical">'
+  bottomString = '</select></div></div><br><input type="submit" value="Generate Chart"></form>'
+  selectionOption = '<option value="season">Season</option><option value="age">Age</option>'
+  for i in playerStats:
+    #These are for the longer categories that need to be changed to acronyms (SHTOI, PPTOIPG, etc)
+    if (not i.islower()):
+      selectionOption = selectionOption+'<option value="'+(i[0]+remove_lower(i)).upper()+'">'+re.sub(r"(?<=\w)([A-Z])", r" \1", i).capitalize()+'</option>'
+    #These are the stats that aren't acronyms (Goals, assists, etc.)
+    else:
+      selectionOption = selectionOption+'<option value="'+i.capitalize()+'">'+i.capitalize()+'</option>'
+  return topString+selectionOption+middleString+selectionOption+bottomString
 
 #player is the part of the JSON that comes from the 'roster' section of the team
 def get_player_stats(player):
@@ -295,7 +315,8 @@ def index():
 def player_link():
   startTime = time.perf_counter()
   print ("Fetching player data for "+request.args.get('fullName', type = str))
-  playerString = "<style>"+getTableProperties()+getToolTip()+"</style><table style='float:center'><h1 style='text-align:center;' >"+'<a href="https://www.nhl.com/player/'+str(request.args.get('id', type = str))+'"target="_blank">'+request.args.get('fullName', type = str)+'</a>'+"</h1><br><br><br><tr>"+return_player_data(request.args.get('id', type = str))+"</table>"
+  playerID = request.args.get('id', type = str)
+  playerString = "<style>"+getTableProperties()+getToolTip()+"</style><table style='float:center'><h1 style='text-align:center;' >"+'<a href="https://www.nhl.com/player/'+str(playerID)+'"target="_blank">'+request.args.get('fullName', type = str)+'</a>'+"</h1><br><br><br><tr>"+return_player_data(playerID)+"</table>"+getCategories(playerID)
   endTime = time.perf_counter()
   print("App ran in "+str(endTime-startTime)+" seconds.")
   return playerString
