@@ -55,16 +55,17 @@ def getCategories(playerID):
   #Top of the string
   topString = '<form action="/generate-chart/'+playerID+'" target="_blank" align="center"><div class="row"><div class="column"><h3>Horizontal axis</h3><select id="horizontal" name="horizontal">'
   middleString = '</select></div><div class="column"><h3>Vertical axis</h3><select id="vertical" name="vertical">'
-  bottomString = '</select></div></div><br><input type="checkbox" id="perGame" name="perGame" value="True"><label for="perGame">Generate stats per game</label><br><input type="checkbox" id="sameGraph" name="sameGraph" value="True"><label for="sameGraph">Generate output on same graph</label><br><br><input type="submit" value="Generate Chart"></form>'
+  bottomString = '</select></div></div><br><input type="checkbox" id="xPerGame" name="xPerGame" value="True"><label for="xPerGame">Generate stats per game in horizontal</label><br><input type="checkbox" id="yPerGame" name="yPerGame" value="True"><label for="yPerGame">Generate stats per game in vertical</label><br><input type="checkbox" id="sameGraph" name="sameGraph" value="True"><label for="sameGraph">Generate output on same graph</label><br><br><input type="submit" value="Generate Chart"></form>'
   selectionOption = '<option value="season">Season</option><option value="age">Age</option>'
   verticalOption = ''
   for i in playerStats:
-    #These are for the longer categories that need to be changed to acronyms (SHTOI, PPTOIPG, etc)
-    if (not i.islower()):
-      verticalOption = verticalOption+'<option value="'+i+'">'+re.sub(r"(?<=\w)([A-Z])", r" \1", i).capitalize()+'</option>'
-    #These are the stats that aren't acronyms (Goals, assists, etc.)
-    else:
-      verticalOption = verticalOption+'<option value="'+i+'">'+i.capitalize()+'</option>'
+    if not "PerGame" in i:
+      #These are for the longer categories that need to be changed to acronyms (SHTOI, PPTOIPG, etc)
+      if (not i.islower()):
+        verticalOption = verticalOption+'<option value="'+i+'">'+re.sub(r"(?<=\w)([A-Z])", r" \1", i).capitalize()+'</option>'
+      #These are the stats that aren't acronyms (Goals, assists, etc.)
+      else:
+        verticalOption = verticalOption+'<option value="'+i+'">'+i.capitalize()+'</option>'
   return topString+selectionOption+verticalOption+middleString+verticalOption+bottomString
 
 #player is the part of the JSON that comes from the 'roster' section of the team
@@ -308,30 +309,31 @@ def makePlot(playerID):
   currentYear = datetime.datetime.now().year
   while playerAge>=18:
     try:
-      playerData = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)+"/stats?stats=statsSingleSeason&season="+str(currentYear-1)+str(currentYear)).json()
-      verticalAxis.insert(0, playerData['stats'][0]['splits'][0]['stat'][str(request.args.get('vertical', type = str))])
-      if (str(request.args.get('horizontal', type = str))=='age'):
+      xFactor = 1
+      yFactor = 1
+      playerJSON = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)+"/stats?stats=statsSingleSeason&season="+str(currentYear-1)+str(currentYear)).json()
+      playerData = playerJSON['stats'][0]['splits'][0]['stat']
+      #Checking if the per game modifier has been checked off
+      if str(request.args.get('xPerGame', type = str)) == 'True':
+        xFactor = playerData['games']
+      if str(request.args.get('yPerGame', type = str)) == 'True':
+        yFactor = playerData['games']
+      verticalAxis.insert(0, playerData[verticalInput]/yFactor)
+      if horizontalInput=='age':
         horizontalAxis.insert(0,playerAge)
-      elif (str(request.args.get('horizontal', type = str))=='season'):
+      elif horizontalInput=='season':
         horizontalAxis.insert(0,"'"+str(currentYear)[2:4])
       else:
-        horizontalAxis.insert(0,playerData['stats'][0]['splits'][0]['stat'][horizontalInput])
+        horizontalAxis.insert(0,playerData[horizontalInput]/xFactor)
     except IndexError:
       print("No stats for "+str(currentYear-1)+"-"+str(currentYear))
     currentYear-=1
     playerAge-=1
-  #Experimental plotting tool
   print ("The horizontal array is "+str(horizontalAxis))
   print ("The vertical array is "+str(verticalAxis))
-  #Setting the plot library
-  perGame = ''
-  if str(request.args.get('perGame', type = str)) == 'True':
-    perGame = 'Per game'
-  else:
-    perGame = 'Total'
+  #Give the axes proper names
   horizontalTitle = ''
   verticalTitle = ''
-  #Give the axes proper names
   if (not horizontalInput.islower()):
     horizontalTitle = re.sub(r"(?<=\w)([A-Z])", r" \1", horizontalInput).capitalize()
   else:
@@ -342,9 +344,13 @@ def makePlot(playerID):
     verticalTitle =verticalInput.capitalize()
   fig, ax = plt.subplots()
   if (str(request.args.get('horizontal', type = str))=='age' or str(request.args.get('horizontal', type = str))=='season'):
-    ax.plot(horizontalAxis, verticalAxis, linestyle='--', marker='o', color='r', label = perGame)
+    ax.plot(horizontalAxis, verticalAxis, linestyle='--', marker='o', color='r', label = 'Data')
   else:
-    ax.scatter(horizontalAxis, verticalAxis, c='#000000', s = 10, label = perGame, alpha=0.5, marker="+")
+    ax.scatter(horizontalAxis, verticalAxis, c='#000000', s = 10, label = "Data", alpha=0.5, marker="+")
+  if (str(request.args.get('xPerGame', type = str) == 'True' and not(horizontalInput=='age' or horizontalInput=='season'))=='True'):
+    horizontalTitle = horizontalTitle + " per game"
+  if str(request.args.get('yPerGame', type = str)) == 'True':
+    verticalTitle = verticalTitle + " per game"
   #ax.scatter(horizontalAxis, verticalAxis, c='#3a34eb', s = 2, label = perGame, alpha=0.5)
   #plt.scatter(x, y, s=area, c=colors, alpha=0.5)
   #ax.plot(horizontalAxis, verticalAxis, '--bo', label = perGame)
@@ -359,7 +365,6 @@ def makePlot(playerID):
     print("Deleting your files!")
     os.remove('plots/currentChart.png') 
   plt.savefig('plots/currentChart.png')
-  #full_filename = os.path.join(app.config['UPLOAD_FOLDER'], 'currentChart.png')
   #full_filename = os.path.join(app.config['UPLOAD_FOLDER'], 'currentChart.png')
   #print ("the filename is "+full_filename)
   #print ("The pwd is "+os.getcwd())
