@@ -9,7 +9,11 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from flask import Flask, render_template, request
+from PIL import Image 
+
+#PEOPLE_FOLDER = os.path.join('..\static', 'plots')
 app = Flask(__name__)
+#app.config['UPLOAD_FOLDER'] = PEOPLE_FOLDER
 
 def get_teams():
   print ('The URL response is '+request.full_path.split("?")[1])
@@ -333,13 +337,17 @@ def makePlot(playerID):
   else:
     horizontalTitle =horizontalInput.capitalize()
   if (not verticalInput.islower()):
-    verticalTitle = re.sub(r"(?<=\w)([A-Z])", r" \1", horizontalInput).capitalize()
+    verticalTitle = re.sub(r"(?<=\w)([A-Z])", r" \1", verticalInput).capitalize()
   else:
     verticalTitle =verticalInput.capitalize()
   fig, ax = plt.subplots()
+  if (str(request.args.get('horizontal', type = str))=='age' or str(request.args.get('horizontal', type = str))=='season'):
+    ax.plot(horizontalAxis, verticalAxis, linestyle='--', marker='o', color='r', label = perGame)
+  else:
+    ax.scatter(horizontalAxis, verticalAxis, c='#000000', s = 10, label = perGame, alpha=0.5, marker="+")
   #ax.scatter(horizontalAxis, verticalAxis, c='#3a34eb', s = 2, label = perGame, alpha=0.5)
   #plt.scatter(x, y, s=area, c=colors, alpha=0.5)
-  ax.plot(horizontalAxis, verticalAxis, '--bo', label = perGame)
+  #ax.plot(horizontalAxis, verticalAxis, '--bo', label = perGame)
   ax.set_xlabel(horizontalTitle)
   ax.set_ylabel(verticalTitle)
   ax.set_title(playerCharacteristics["people"][0]["fullName"])  # Add a title to the axes.
@@ -351,9 +359,16 @@ def makePlot(playerID):
     print("Deleting your files!")
     os.remove('plots/currentChart.png') 
   plt.savefig('plots/currentChart.png')
+  #full_filename = os.path.join(app.config['UPLOAD_FOLDER'], 'currentChart.png')
+  #full_filename = os.path.join(app.config['UPLOAD_FOLDER'], 'currentChart.png')
+  #print ("the filename is "+full_filename)
+  #print ("The pwd is "+os.getcwd())
   endTime = time.perf_counter()
   print("Chart generated in "+str(endTime-startTime)+" seconds.")
-  return ' <img src="currentChart.png" alt="Error generating image"> '
+  im = Image.open(r"plots/currentChart.png")
+  im.show()
+  #return render_template("plotPage.html", user_image = full_filename)
+  return '<h3>Image Generated</h3>'
 
 #This function is to get the results for when you hover over an abbreviated category
 def getToolTip():
