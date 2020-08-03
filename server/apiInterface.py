@@ -21,10 +21,24 @@ def get_teams():
   data = response.json()
   return data["teams"]
 
+def returnWord(inputString):
+  if len(inputString)==0:
+    return ''
+  elif (not inputString.islower()):
+    return re.sub(r"(?<=\w)([A-Z])", r" \1", inputString).capitalize()
+  else:
+    return inputString.capitalize()
+
+def returnAcronym(inputString):
+  if len(inputString)==0:
+    return ''
+  else:
+    remove_lower = lambda text: re.sub('[a-z]', '', text)
+    return (inputString[0]+remove_lower(inputString)).upper()
+
 #This function returns all data for a player in one given season
 def get_season_scores(playerID, age, season, getHeader):
   currentSeason = list()
-  remove_lower = lambda text: re.sub('[a-z]', '', text)
   if getHeader:
     currentSeason.append("Season")
     currentSeason.append("Age")
@@ -37,8 +51,7 @@ def get_season_scores(playerID, age, season, getHeader):
     for i in playerStats:
       if (getHeader):
         if (not i.islower()):
-          #currentSeason.append((i[0]+remove_lower(i)).upper())
-           currentSeason.append('<div class="tooltip">'+(i[0]+remove_lower(i)).upper()+'<span class="tooltiptext">'+re.sub(r"(?<=\w)([A-Z])", r" \1", i).capitalize()+'</span></div>')
+           currentSeason.append('<div class="tooltip">'+returnAcronym(i)+'<span class="tooltiptext">'+returnWord(i)+'</span></div>')
         else:
           currentSeason.append(i.capitalize())
       else:
@@ -60,12 +73,7 @@ def getCategories(playerID):
   verticalOption = ''
   for i in playerStats:
     if not "PerGame" in i:
-      #These are for the longer categories that need to be changed to acronyms (SHTOI, PPTOIPG, etc)
-      if (not i.islower()):
-        verticalOption = verticalOption+'<option value="'+i+'">'+re.sub(r"(?<=\w)([A-Z])", r" \1", i).capitalize()+'</option>'
-      #These are the stats that aren't acronyms (Goals, assists, etc.)
-      else:
-        verticalOption = verticalOption+'<option value="'+i+'">'+i.capitalize()+'</option>'
+      verticalOption = verticalOption+'<option value="'+i+'">'+returnWord(i)+'</option>'
   return topString+selectionOption+verticalOption+middleString+verticalOption+bottomString
 
 #player is the part of the JSON that comes from the 'roster' section of the team
@@ -296,35 +304,55 @@ def return_player_data(playerID):
     currentSeasonStats = get_season_scores(playerID, playerAge, currentYear, False)
   return returnString
 
+def minuteToDecimal(timeString):
+  stringSplit = timeString.split(':')
+  return int(stringSplit[0])+(int(stringSplit[1])/60)
+
 @app.route('/generate-chart/<int:playerID>')
 def makePlot(playerID):
   startTime = time.perf_counter()
   playerCharacteristics = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)).json()
-  #The player's current age
   horizontalAxis = list()
   verticalAxis = list()
+  #These are the values as recieved
   horizontalInput = str(request.args.get('horizontal', type = str))
   verticalInput = str(request.args.get('vertical', type = str))
+  #The player's current age
   playerAge = playerCharacteristics["people"][0]["currentAge"]
   currentYear = datetime.datetime.now().year
+  #Loop to get all the stats for all the years the player has been eligible to play in the league
   while playerAge>=18:
     try:
-      xFactor = 1
-      yFactor = 1
       playerJSON = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)+"/stats?stats=statsSingleSeason&season="+str(currentYear-1)+str(currentYear)).json()
       playerData = playerJSON['stats'][0]['splits'][0]['stat']
       #Checking if the per game modifier has been checked off
-      if str(request.args.get('xPerGame', type = str)) == 'True':
-        xFactor = playerData['games']
-      if str(request.args.get('yPerGame', type = str)) == 'True':
-        yFactor = playerData['games']
-      verticalAxis.insert(0, playerData[verticalInput]/yFactor)
       if horizontalInput=='age':
-        horizontalAxis.insert(0,playerAge)
+          horizontalAxis.insert(0,playerAge)
       elif horizontalInput=='season':
-        horizontalAxis.insert(0,"'"+str(currentYear)[2:4])
+          horizontalAxis.insert(0,"'"+str(currentYear)[2:4])
+      elif str(request.args.get('xPerGame', type = str)) == 'True':
+        if 'imeOnIce' in horizontalInput:
+          horizontalAxis.insert(0,minuteToDecimal(playerData[horizontalInput+'PerGame']))
+        else:
+          horizontalAxis.insert(0,playerData[horizontalInput]/playerData['games'])
       else:
-        horizontalAxis.insert(0,playerData[horizontalInput]/xFactor)
+        if 'imeOnIce' in horizontalInput:
+          horizontalAxis.insert(0,minuteToDecimal(playerData[horizontalInput]))
+        else:
+          horizontalAxis.insert(0,playerData[horizontalInput])
+      
+      if str(request.args.get('yPerGame', type = str)) == 'True':
+        if 'imeOnIce' in verticalInput:
+          verticalAxis.insert(0,minuteToDecimal(playerData[verticalInput+'PerGame']))
+        else:
+          verticalAxis.insert(0,playerData[verticalInput]/playerData['games'])
+      else:
+        if 'imeOnIce' in verticalInput:
+          print ("In area")
+          verticalAxis.insert(0,minuteToDecimal(playerData[verticalInput]))
+        else:
+          print ("In other part")
+          verticalAxis.insert(0,playerData[verticalInput])
     except IndexError:
       print("No stats for "+str(currentYear-1)+"-"+str(currentYear))
     currentYear-=1
@@ -334,31 +362,51 @@ def makePlot(playerID):
   #Give the axes proper names
   horizontalTitle = ''
   verticalTitle = ''
-  if (not horizontalInput.islower()):
-    horizontalTitle = re.sub(r"(?<=\w)([A-Z])", r" \1", horizontalInput).capitalize()
-  else:
-    horizontalTitle =horizontalInput.capitalize()
-  if (not verticalInput.islower()):
-    verticalTitle = re.sub(r"(?<=\w)([A-Z])", r" \1", verticalInput).capitalize()
-  else:
-    verticalTitle =verticalInput.capitalize()
+  horizontalTitle = returnWord(horizontalInput)
+  verticalTitle = returnWord(verticalInput)
+
+  if "imeOnIce" in horizontalInput:
+    horizontalTitle = horizontalTitle + " in minutes"
+  if "imeOnIce" in verticalInput:
+    verticalTitle = verticalTitle + " in minutes"
+  #Make the plots
   fig, ax = plt.subplots()
   if (str(request.args.get('horizontal', type = str))=='age' or str(request.args.get('horizontal', type = str))=='season'):
     ax.plot(horizontalAxis, verticalAxis, linestyle='--', marker='o', color='r', label = 'Data')
   else:
     ax.scatter(horizontalAxis, verticalAxis, c='#000000', s = 10, label = "Data", alpha=0.5, marker="+")
+  '''
+  #This stuff down here doesn't work
+  if 'TimeOnIce' in horizontalInput or 'TimeOnIce' in verticalInput:
+    print("Vertical: "+verticalAxis[0])
+    xDates = list()
+    if 'TimeOnIce' in horizontalInput:
+      xDates = matplotlib.dates.date2num(horizontalAxis)
+    else:
+      xDates = horizontalAxis
+    if 'TimeOnIce' in verticalInput:
+      yDates = matplotlib.dates.date2num(verticalAxis)
+    else:
+      yDates = verticalAxis
+    plt.plot_date(xDates, yDates, xdate='TimeOnIce' in horizontalInput, ydate='TimeOnIce' in verticalInput)
+    if 'TimeOnIce' in horizontalInput:
+      plt.gcf().autofmt_xdate()
+  #This stuff here works
+  else:
+    if (str(request.args.get('horizontal', type = str))=='age' or str(request.args.get('horizontal', type = str))=='season'):
+      ax.plot(horizontalAxis, verticalAxis, linestyle='--', marker='o', color='r', label = 'Data')
+    else:
+      ax.scatter(horizontalAxis, verticalAxis, c='#000000', s = 10, label = "Data", alpha=0.5, marker="+")
+  '''
+  #Labels for the axes
   if (str(request.args.get('xPerGame', type = str) == 'True' and not(horizontalInput=='age' or horizontalInput=='season'))=='True'):
     horizontalTitle = horizontalTitle + " per game"
   if str(request.args.get('yPerGame', type = str)) == 'True':
     verticalTitle = verticalTitle + " per game"
-  #ax.scatter(horizontalAxis, verticalAxis, c='#3a34eb', s = 2, label = perGame, alpha=0.5)
-  #plt.scatter(x, y, s=area, c=colors, alpha=0.5)
-  #ax.plot(horizontalAxis, verticalAxis, '--bo', label = perGame)
   ax.set_xlabel(horizontalTitle)
   ax.set_ylabel(verticalTitle)
-  ax.set_title(playerCharacteristics["people"][0]["fullName"])  # Add a title to the axes.
+  ax.set_title(playerCharacteristics["people"][0]["fullName"])  # Add a title to the graph.
   ax.legend()  # Add a legend.
-  #plt.savefig('plots/'+str(playerCharacteristics["people"][0]["fullName"])+"_"+str(request.args.get('vertical', type = str))+"_"+str(request.args.get('horizontal', type = str))+'.png')
   if str(request.args.get('sameGraph', type = str))=='True':
     print ("You checked off sameGraph!")
   if os.path.isfile('plots/currentChart.png') and str(request.args.get('sameGraph', type = str))!='True':
