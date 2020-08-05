@@ -14,6 +14,16 @@ from PIL import Image
 #PEOPLE_FOLDER = os.path.join('..\static', 'plots')
 app = Flask(__name__)
 #app.config['UPLOAD_FOLDER'] = PEOPLE_FOLDER
+FANTASY_SKATER_STATISTICS = ['goals', 'assists', 'pim', 'powerPlayPoints', 'shortHandedPoints', 'shots', 'hits', 'blocked']
+FANTASY_GOALIE_STATISTICS = ['wins', 'goalsAgainst', 'saves', 'shutouts']
+FANTASY_SKATER_SCORES = list()
+FANTASY_GOALIE_SCORES = list()
+
+def getFantasyStatistics():
+  for i in FANTASY_SKATER_STATISTICS:
+    FANTASY_SKATER_SCORES.append(request.args.get(i, type = float))
+  for i in FANTASY_GOALIE_STATISTICS:
+    FANTASY_GOALIE_SCORES.append(request.args.get(i, type = float))
 
 def get_teams():
   print ('The URL response is '+request.full_path.split("?")[1])
@@ -92,10 +102,10 @@ def get_player_stats(player):
       currentPlayer.append(player["position"]["abbreviation"])
       #Goalie stats
       if (player["position"]["abbreviation"]=='G'):
-        win = request.args.get('win', type = float) * playerStats["wins"]
-        ga = request.args.get('ga', type = float) * playerStats["goalsAgainst"]
-        save = request.args.get('save', type = float) * playerStats["saves"]
-        shutout = request.args.get('so', type = float) * playerStats["shutouts"]
+        win = request.args.get('wins', type = float) * playerStats["wins"]
+        ga = request.args.get('goalsAgainst', type = float) * playerStats["goalsAgainst"]
+        save = request.args.get('saves', type = float) * playerStats["saves"]
+        shutout = request.args.get('shutouts', type = float) * playerStats["shutouts"]
         fantasyScore = round(win + ga + save + shutout, 1)
         pointsPerGame = fantasyScore/playerStats["games"]
         currentPlayer.append(str(fantasyScore))
@@ -110,11 +120,11 @@ def get_player_stats(player):
         goals = request.args.get('goals', type = float) * playerStats["goals"]
         assists = request.args.get('assists', type = float) * playerStats["assists"]
         pim = request.args.get('pim', type = float) * playerStats["pim"]
-        ppp = request.args.get('ppp', type = float) * playerStats["powerPlayPoints"]
-        shp = request.args.get('shp', type = float) * playerStats["shortHandedPoints"]
-        sog = request.args.get('sog', type = float) * playerStats["shots"]
-        hit = request.args.get('hit', type = float) * playerStats["hits"]
-        blk = request.args.get('blk', type = float) * playerStats["blocked"]
+        ppp = request.args.get('powerPlayPoints', type = float) * playerStats["powerPlayPoints"]
+        shp = request.args.get('shortHandedPoints', type = float) * playerStats["shortHandedPoints"]
+        sog = request.args.get('shots', type = float) * playerStats["shots"]
+        hit = request.args.get('hits', type = float) * playerStats["hits"]
+        blk = request.args.get('blocked', type = float) * playerStats["blocked"]
         fantasyScore = goals + assists + pim + ppp + shp + sog + hit + blk
         pointsPerGame = fantasyScore/playerStats["games"]
         currentPlayer.append(str(fantasyScore))
@@ -348,10 +358,8 @@ def makePlot(playerID):
           verticalAxis.insert(0,playerData[verticalInput]/playerData['games'])
       else:
         if 'imeOnIce' in verticalInput:
-          print ("In area")
           verticalAxis.insert(0,minuteToDecimal(playerData[verticalInput]))
         else:
-          print ("In other part")
           verticalAxis.insert(0,playerData[verticalInput])
     except IndexError:
       print("No stats for "+str(currentYear-1)+"-"+str(currentYear))
@@ -453,6 +461,7 @@ def player_link():
 @app.route('/my-link/')
 def my_link():
   startTime = time.perf_counter()
+  getFantasyStatistics()
   #return return_teams()
   fileNameString = "saves/"+str(datetime.datetime.now().year)+request.full_path.split("?")[1]
   seasonString =""

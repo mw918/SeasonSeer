@@ -1,7 +1,7 @@
 - A checkbox to allow users to download the HTML file
-- When you click on the link to a player, it takes you to their own page (not NHL page)
 - A loading screen as things generate
 - Customizable stats and columns to see
 - Ability to sort based on column
 - Ability to add column to add team next to player name
 - Bug to fix: If you remove a column from the list of things to put, then the sorting doesn't work
+- Add ability to show fantasy stats in personal stats, alongside all the other factors that go into it
