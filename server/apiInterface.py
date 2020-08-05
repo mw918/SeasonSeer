@@ -102,22 +102,31 @@ def get_player_stats(player):
       currentPlayer.append(player["position"]["abbreviation"])
       #Goalie stats
       if (player["position"]["abbreviation"]=='G'):
-        win = request.args.get('wins', type = float) * playerStats["wins"]
-        ga = request.args.get('goalsAgainst', type = float) * playerStats["goalsAgainst"]
-        save = request.args.get('saves', type = float) * playerStats["saves"]
-        shutout = request.args.get('shutouts', type = float) * playerStats["shutouts"]
-        fantasyScore = round(win + ga + save + shutout, 1)
-        pointsPerGame = fantasyScore/playerStats["games"]
-        currentPlayer.append(str(fantasyScore))
-        currentPlayer.append(str(pointsPerGame))
-        currentPlayer.append(str(playerStats["games"]))
-        currentPlayer.append(str(playerStats["wins"]))
-        currentPlayer.append(str(playerStats["goalsAgainst"]))
-        currentPlayer.append(str(playerStats["saves"]))
-        currentPlayer.append(str(playerStats["shutouts"]))
+        fantasyScore=0
+        counter = 0
+        #i is the category name, category is the index for the statistic actual value
+        for i in FANTASY_GOALIE_STATISTICS:
+          fantasyScore += FANTASY_GOALIE_SCORES[counter]*playerStats[i]
+          currentPlayer.append(playerStats[i])
+          counter+=1
+        fantasyScore = round(fantasyScore, 1)
+        currentPlayer.insert(3,fantasyScore)
+        currentPlayer.insert(4,fantasyScore/playerStats["games"])
+        currentPlayer.insert(5,playerStats["games"])
       #Skater stats
       else:
-        goals = request.args.get('goals', type = float) * playerStats["goals"]
+        fantasyScore=0
+        counter = 0
+        #i is the category name, category is the index for the statistic actual value
+        for i in FANTASY_SKATER_STATISTICS:
+          fantasyScore += FANTASY_SKATER_SCORES[counter]*playerStats[i]
+          currentPlayer.append(playerStats[i])
+          counter+=1
+        currentPlayer.insert(3,fantasyScore)
+        currentPlayer.insert(4,fantasyScore/playerStats["games"])
+        currentPlayer.insert(5,playerStats["games"])
+        currentPlayer.insert(8,playerStats["points"])
+        '''goals = request.args.get('goals', type = float) * playerStats["goals"]
         assists = request.args.get('assists', type = float) * playerStats["assists"]
         pim = request.args.get('pim', type = float) * playerStats["pim"]
         ppp = request.args.get('powerPlayPoints', type = float) * playerStats["powerPlayPoints"]
@@ -138,7 +147,7 @@ def get_player_stats(player):
         currentPlayer.append(str(playerStats["shortHandedPoints"]))
         currentPlayer.append(str(playerStats["shots"]))
         currentPlayer.append(str(playerStats["hits"]))
-        currentPlayer.append(str(playerStats["blocked"]))
+        currentPlayer.append(str(playerStats["blocked"]))'''
     #This only happens for players who are on the roster, but haven't played any games
     except IndexError:
       print("No stats for "+currentPlayer[0])
@@ -195,6 +204,7 @@ def return_players_last_season():
   print("Begin printing...")
   allPlayers = get_all_players()
   counter = 0
+  print("Begin printing HTML file")
   #We manually append everything because I tried doing it via queue, and it took up a whole week to implement, and it made it 10x slower anyways
   headerString = "<tr><th>Rank</th><th>Name</th><th>Number</th><th>Position</th><th>Fantasy Score</th><th>Fantasy Score Per Game</th><th>GP</th>"
   returnString = "<style>"+getTableProperties()+"</style>"
@@ -216,7 +226,7 @@ def return_players_last_season():
     try:
       returnString = returnString +'<td>'+ str(counter) +'</td>'
       for j in i:
-          returnString = returnString +'<td>'+ j +'</td>'
+          returnString = returnString +'<td>'+ str(j) +'</td>'
       '''
       #Goalie stats
       if (i[2]=='G'):
