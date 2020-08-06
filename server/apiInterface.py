@@ -46,6 +46,39 @@ def returnAcronym(inputString):
     remove_lower = lambda text: re.sub('[a-z]', '', text)
     return (inputString[0]+remove_lower(inputString)).upper()
 
+#playerID is the player's ID, categoryName is the statistical category the user asked for, and perGame is a check on whether or not they want it per game
+def createPlotArray(playerID, categoryName, perGame):
+  returnList = list()
+  playerCharacteristics = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)).json()
+  #The player's current age
+  playerAge = playerCharacteristics["people"][0]["currentAge"]
+  currentYear = datetime.datetime.now().year
+  #Loop to get all the stats for all the years the player has been eligible to play in the league
+  while playerAge>=18:
+    try:
+      playerJSON = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)+"/stats?stats=statsSingleSeason&season="+str(currentYear-1)+str(currentYear)).json()
+      playerData = playerJSON['stats'][0]['splits'][0]['stat']
+      #Checking if the per game modifier has been checked off
+      if categoryName=='age':
+          returnList.insert(0,playerAge)
+      elif categoryName=='season':
+          returnList.insert(0,"'"+str(currentYear)[2:4])
+      elif perGame == 'True':
+        if 'imeOnIce' in categoryName:
+          returnList.insert(0,minuteToDecimal(playerData[categoryName+'PerGame']))
+        else:
+          returnList.insert(0,playerData[categoryName]/playerData['games'])
+      else:
+        if 'imeOnIce' in categoryName:
+          returnList.insert(0,minuteToDecimal(playerData[categoryName]))
+        else:
+          returnList.insert(0,playerData[categoryName])
+    except IndexError:
+      print("No stats for "+str(currentYear-1)+"-"+str(currentYear))
+    currentYear-=1
+    playerAge-=1
+  return returnList
+
 #This function returns all data for a player in one given season
 def get_season_scores(playerID, age, season, getHeader):
   currentSeason = list()
@@ -126,28 +159,6 @@ def get_player_stats(player):
         currentPlayer.insert(4,fantasyScore/playerStats["games"])
         currentPlayer.insert(5,playerStats["games"])
         currentPlayer.insert(8,playerStats["points"])
-        '''goals = request.args.get('goals', type = float) * playerStats["goals"]
-        assists = request.args.get('assists', type = float) * playerStats["assists"]
-        pim = request.args.get('pim', type = float) * playerStats["pim"]
-        ppp = request.args.get('powerPlayPoints', type = float) * playerStats["powerPlayPoints"]
-        shp = request.args.get('shortHandedPoints', type = float) * playerStats["shortHandedPoints"]
-        sog = request.args.get('shots', type = float) * playerStats["shots"]
-        hit = request.args.get('hits', type = float) * playerStats["hits"]
-        blk = request.args.get('blocked', type = float) * playerStats["blocked"]
-        fantasyScore = goals + assists + pim + ppp + shp + sog + hit + blk
-        pointsPerGame = fantasyScore/playerStats["games"]
-        currentPlayer.append(str(fantasyScore))
-        currentPlayer.append(str(pointsPerGame))
-        currentPlayer.append(str(playerStats["games"]))
-        currentPlayer.append(str(playerStats["goals"]))
-        currentPlayer.append(str(playerStats["assists"]))
-        currentPlayer.append(str(playerStats["points"]))
-        currentPlayer.append(str(playerStats["pim"]))
-        currentPlayer.append(str(playerStats["powerPlayPoints"]))
-        currentPlayer.append(str(playerStats["shortHandedPoints"]))
-        currentPlayer.append(str(playerStats["shots"]))
-        currentPlayer.append(str(playerStats["hits"]))
-        currentPlayer.append(str(playerStats["blocked"]))'''
     #This only happens for players who are on the roster, but haven't played any games
     except IndexError:
       print("No stats for "+currentPlayer[0])
@@ -227,20 +238,6 @@ def return_players_last_season():
       returnString = returnString +'<td>'+ str(counter) +'</td>'
       for j in i:
           returnString = returnString +'<td>'+ str(j) +'</td>'
-      '''
-      #Goalie stats
-      if (i[2]=='G'):
-        if request.args.get('positions', type = str)=="goalie":
-          for j in i:
-            returnString = returnString +'<td>'+ j +'</td>'
-        else:
-          for j in range(6):
-            returnString = returnString + '<td>'+ i[j] + '</td>'
-        #Skater stats
-      else:
-        for j in i:
-          returnString = returnString +'<td>'+ j +'</td>'
-          '''
       returnString = returnString + '</tr>'
     #This only happens for players who are on the roster, but haven't played any games
     except IndexError:
@@ -248,58 +245,6 @@ def return_players_last_season():
   returnString = returnString+"</table>"
   print(str(counter)+" players counted.")
   return returnString
-
-'''
-#This block of code is basically obsolete
-def return_teams():
-    startTime = time.perf_counter()
-    teams = get_teams()
-    rosterString = "<style>table, th, td {border: 2px solid powderblue;}</style>"
-    goalieString = "<table style='float:center'><caption>Goalie Stats</caption>"
-    goalieString = goalieString + "<tr><th>Name</th><th>Number</th><th>Position</th><th>Team</th><th>Fantasy Score</th><th>Wins</th><th>GA</th><th>SV</th><th>SO</th></tr>"
-    #This loop goes through the teams one by one
-    for x in teams:
-        api_url_base = 'https://statsapi.web.nhl.com/api/v1/teams/' + str(x["id"]) + '/roster'
-        teamResponse = requests.get(api_url_base)
-        teamData = teamResponse.json()
-        currentTeam = ""
-        currentGoalies = ""
-        print("Writing "+x["name"])
-        currentTeam = currentTeam + '<table style="float:center"><caption><a href="'+x["officialSiteUrl"]+'" target="_blank">'+x["name"]+'</a></caption>'
-        currentTeam = currentTeam + "<tr><th>Name</th><th>Number</th><th>Position</th><th>Fantasy Score</th><th>GP</th><th>Goals</th><th>Assists</th><th>Points</th><th>PIM</th><th>PPP</th><th>SHP</th><th>SOG</th><th>HIT</th><th>BLK</th></tr>"
-        #This loop goes through the members of the roster one by one
-        for i in teamData["roster"]:
-          try:
-            currentPlayer = get_player_stats(i)
-            playerSpecs = '<tr><td><a href="https://www.nhl.com/player/'+str(i["person"]["id"])+'"target="_blank">'+currentPlayer[0]+'</a></td>'
-            list_iter = iter(currentPlayer)
-            next(list_iter)
-            currentTeam = currentTeam + playerSpecs
-            for j in list_iter:
-                currentTeam = currentTeam +'<td>'+ j +'</td>'
-            #Goalie stats
-            if (i["position"]["abbreviation"]=='G'):
-              currentTeam = currentTeam + '<td>'+currentPlayer[1] + '</td><td>'+ currentPlayer[2] + '</td><td>'+ currentPlayer[3] + '</td></tr>'
-              for j in list_iter:
-                currentGoalies = currentGoalies +'<td>'+j +'</td>'
-              #Skater stats
-            else:
-              for j in list_iter:
-                currentTeam = currentTeam +'<td>'+ j +'</td>'
-            currentTeam = currentTeam + '</tr>'
-          #This only happens for players who are on the roster, but haven't played any games
-          except IndexError:
-            print("No stats for "+i["person"]["fullName"])
-        currentTeam = currentTeam + "</table>"
-        currentTeam = currentTeam + "<br>"
-        rosterString = rosterString+currentTeam
-        goalieString = goalieString+currentGoalies
-    print("Writing goalie stats")
-    rosterString = rosterString+goalieString+"</table>"
-    endTime = time.perf_counter()
-    print("App ran in "+str(endTime-startTime)+" seconds.")
-    return rosterString
-'''
 
 def return_player_data(playerID):
   currentYear = datetime.datetime.now().year
@@ -331,13 +276,13 @@ def minuteToDecimal(timeString):
 @app.route('/generate-chart/<int:playerID>')
 def makePlot(playerID):
   startTime = time.perf_counter()
-  playerCharacteristics = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)).json()
   horizontalAxis = list()
   verticalAxis = list()
   #These are the values as recieved
   horizontalInput = str(request.args.get('horizontal', type = str))
   verticalInput = str(request.args.get('vertical', type = str))
   #The player's current age
+  playerCharacteristics = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)).json()
   playerAge = playerCharacteristics["people"][0]["currentAge"]
   currentYear = datetime.datetime.now().year
   #Loop to get all the stats for all the years the player has been eligible to play in the league
@@ -393,29 +338,6 @@ def makePlot(playerID):
     ax.plot(horizontalAxis, verticalAxis, linestyle='--', marker='o', color='r', label = 'Data')
   else:
     ax.scatter(horizontalAxis, verticalAxis, c='#000000', s = 10, label = "Data", alpha=0.5, marker="+")
-  '''
-  #This stuff down here doesn't work
-  if 'TimeOnIce' in horizontalInput or 'TimeOnIce' in verticalInput:
-    print("Vertical: "+verticalAxis[0])
-    xDates = list()
-    if 'TimeOnIce' in horizontalInput:
-      xDates = matplotlib.dates.date2num(horizontalAxis)
-    else:
-      xDates = horizontalAxis
-    if 'TimeOnIce' in verticalInput:
-      yDates = matplotlib.dates.date2num(verticalAxis)
-    else:
-      yDates = verticalAxis
-    plt.plot_date(xDates, yDates, xdate='TimeOnIce' in horizontalInput, ydate='TimeOnIce' in verticalInput)
-    if 'TimeOnIce' in horizontalInput:
-      plt.gcf().autofmt_xdate()
-  #This stuff here works
-  else:
-    if (str(request.args.get('horizontal', type = str))=='age' or str(request.args.get('horizontal', type = str))=='season'):
-      ax.plot(horizontalAxis, verticalAxis, linestyle='--', marker='o', color='r', label = 'Data')
-    else:
-      ax.scatter(horizontalAxis, verticalAxis, c='#000000', s = 10, label = "Data", alpha=0.5, marker="+")
-  '''
   #Labels for the axes
   if (str(request.args.get('xPerGame', type = str) == 'True' and not(horizontalInput=='age' or horizontalInput=='season'))=='True'):
     horizontalTitle = horizontalTitle + " per game"
@@ -463,7 +385,7 @@ def player_link():
   startTime = time.perf_counter()
   print ("Fetching player data for "+request.args.get('fullName', type = str))
   playerID = request.args.get('id', type = str)
-  playerString = "<style>"+getTableProperties()+getToolTip()+"</style><table style='float:center'><h1 style='text-align:center;' >"+'<a href="https://www.nhl.com/player/'+str(playerID)+'"target="_blank">'+request.args.get('fullName', type = str)+'</a>'+"</h1><br><br><br><tr>"+return_player_data(playerID)+"</table>"+getCategories(playerID)
+  playerString = "<style>"+getTableProperties()+getToolTip()+"</style><table align='center style='float:center'><h1 style='text-align:center;' >"+'<a href="https://www.nhl.com/player/'+str(playerID)+'"target="_blank">'+request.args.get('fullName', type = str)+'</a>'+"</h1><br><br><br><tr>"+return_player_data(playerID)+"</table>"+getCategories(playerID)
   endTime = time.perf_counter()
   print("Player's stats fetched in "+str(endTime-startTime)+" seconds.")
   return playerString
