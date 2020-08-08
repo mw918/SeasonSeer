@@ -20,6 +20,8 @@ FANTASY_SKATER_SCORES = list()
 FANTASY_GOALIE_SCORES = list()
 
 def getFantasyStatistics():
+  global FANTASY_SKATER_SCORES
+  global FANTASY_GOALIE_SCORES
   for i in FANTASY_SKATER_STATISTICS:
     FANTASY_SKATER_SCORES.append(request.args.get(i, type = float))
   for i in FANTASY_GOALIE_STATISTICS:
@@ -49,6 +51,7 @@ def returnAcronym(inputString):
 #playerID is the player's ID, categoryName is the statistical category the user asked for, and perGame is a check on whether or not they want it per game
 def createPlotArray(playerID, categoryName, perGame):
   returnList = list()
+  print("The categoryName is "+str(categoryName))
   playerCharacteristics = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)).json()
   #The player's current age
   playerAge = playerCharacteristics["people"][0]["currentAge"]
@@ -77,6 +80,47 @@ def createPlotArray(playerID, categoryName, perGame):
       print("No stats for "+str(currentYear-1)+"-"+str(currentYear))
     currentYear-=1
     playerAge-=1
+  return returnList
+
+#playerID is the player's ID, weightsArray is the array of weights for each category, and perGame is a check on whether or not they want it per game
+def createFantasyGrid(playerID, weightsArray, perGame):
+  #This is an array of arrays
+  returnList = list()
+  playerCharacteristics = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)).json()
+  #The player's current age
+  playerAge = playerCharacteristics["people"][0]["currentAge"]
+  if playerCharacteristics["people"][0]["primaryPosition"]['abbreviation']=='G':
+    categoryArray = FANTASY_GOALIE_STATISTICS
+  else:
+    categoryArray = FANTASY_SKATER_STATISTICS
+  returnList = [[] for i in range (len(categoryArray))]
+  currentYear = datetime.datetime.now().year
+  #Loop to get all the stats for all the years the player has been eligible to play in the league
+  while playerAge>=18:
+    try:
+      playerJSON = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)+"/stats?stats=statsSingleSeason&season="+str(currentYear-1)+str(currentYear)).json()
+      playerData = playerJSON['stats'][0]['splits'][0]['stat']
+      counter = 0
+      #Checking if the per game modifier has been checked off
+      if perGame == 'True':
+        for i in categoryArray:
+          if 'imeOnIce' in i:
+            returnList[counter].append(minuteToDecimal(playerData[i+'PerGame'])*weightsArray[counter])
+          else:
+            returnList[counter].append(playerData[i]/playerData['games']*weightsArray[counter])
+          counter+=1
+      else:
+        for i in categoryArray:
+          if 'imeOnIce' in i:
+            returnList[counter].append(minuteToDecimal(playerData[i])*weightsArray[counter])
+          else:
+            returnList[counter].append(playerData[i]*weightsArray[counter])
+          counter+=1
+    except IndexError:
+      print("No stats for "+str(currentYear-1)+"-"+str(currentYear))
+    currentYear-=1
+    playerAge-=1
+  #This returns the points in fantasy the player has gotten in each category, going backwards in year
   return returnList
 
 #This function returns all data for a player in one given season
@@ -109,32 +153,35 @@ def getCategories(playerID):
   playerData = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)+"/stats?stats=statsSingleSeason&season="+str(currentYear-1)+str(currentYear)).json()
   playerStats = playerData['stats'][0]['splits'][0]['stat']
   #Top of the string
-  topString = '<form action="/generate-chart/'+playerID+'" target="_blank" align="center"><div class="row"><div class="column"><h3>Horizontal axis</h3><select id="horizontal" name="horizontal">'
+  #Current issue: the statsArray doesn't make it over to the next page
+  #statsArray='+request.args.get('statsArray', type = str)+' &playerID='+playerID+'
+  topString = '<form action="/generate-chart/" target="_blank" align="center"><div class="row"><div class="column"><h3>Horizontal axis</h3><select id="horizontal" name="horizontal">'
   middleString = '</select></div><div class="column"><h3>Vertical axis</h3><select id="vertical" name="vertical">'
-  bottomString = '</select></div></div><br><input type="checkbox" id="xPerGame" name="xPerGame" value="True"><label for="xPerGame">Generate stats per game in horizontal</label><br><input type="checkbox" id="yPerGame" name="yPerGame" value="True"><label for="yPerGame">Generate stats per game in vertical</label><br><input type="checkbox" id="sameGraph" name="sameGraph" value="True"><label for="sameGraph">Generate output on same graph</label><br><br><input type="submit" value="Generate Chart"></form>'
+  bottomString = '</select></div></div><br><input type="hidden" class="form-control" name="playerID" id="playerID" value="'+playerID+'"><input type="hidden" class="form-control" name="statsArray" id="statsArray" value="'+str(request.args.get('statsArray', type = str))+'"><input type="checkbox" id="xPerGame" name="xPerGame" value="True"><label for="xPerGame">Generate stats per game in horizontal</label><br><input type="checkbox" id="yPerGame" name="yPerGame" value="True"><label for="yPerGame">Generate stats per game in vertical</label><br><input type="checkbox" id="sameGraph" name="sameGraph" value="True"><label for="sameGraph">Generate output on same graph</label><br><br><input type="submit" value="Generate Chart"></form>'
   selectionOption = '<option value="season">Season</option><option value="age">Age</option>'
+  fantasyOption = '<option value="fantasyScore">Fantasy score</option>'
   verticalOption = ''
   for i in playerStats:
     if not "PerGame" in i:
       verticalOption = verticalOption+'<option value="'+i+'">'+returnWord(i)+'</option>'
-  return topString+selectionOption+verticalOption+middleString+verticalOption+bottomString
+  return topString+selectionOption+verticalOption+middleString+fantasyOption+verticalOption+bottomString
 
 #player is the part of the JSON that comes from the 'roster' section of the team
-def get_player_stats(player):
+def get_player_stats(player, year):
     currentPlayer = list()
     try:
-      currentYear = datetime.datetime.now().year
-      player_base = "https://statsapi.web.nhl.com/api/v1/people/"+str(player["person"]["id"])+"/stats?stats=statsSingleSeason&season="+str(currentYear-1)+str(currentYear)
+      player_base = "https://statsapi.web.nhl.com/api/v1/people/"+str(player["person"]["id"])+"/stats?stats=statsSingleSeason&season="+year
       playerResponse = requests.get(player_base)
       playerData = playerResponse.json()
       #This variable is the list of all stats for one player
       playerStats = playerData['stats'][0]['splits'][0]['stat']
       #currentPlayer.append('<a href="https://www.nhl.com/player/'+str(player["person"]["id"])+'"target="_blank">'+player["person"]["fullName"]+'</a>')
-      currentPlayer.append('<a href="'+'/player-page/?fullName='+player["person"]["fullName"]+'&id='+str(player["person"]["id"])+' "target="_blank">'+player["person"]["fullName"]+'</a>')
+      
       currentPlayer.append(player["jerseyNumber"])
       currentPlayer.append(player["position"]["abbreviation"])
       #Goalie stats
       if (player["position"]["abbreviation"]=='G'):
+        currentPlayer.insert(0,'<a href="'+'/player-page/?fullName='+player["person"]["fullName"]+'&id='+str(player["person"]["id"])+' &statsArray='+str(FANTASY_GOALIE_SCORES)+' "target="_blank">'+player["person"]["fullName"]+'</a>')
         fantasyScore=0
         counter = 0
         #i is the category name, category is the index for the statistic actual value
@@ -148,6 +195,7 @@ def get_player_stats(player):
         currentPlayer.insert(5,playerStats["games"])
       #Skater stats
       else:
+        currentPlayer.insert(0,'<a href="'+'/player-page/?fullName='+player["person"]["fullName"]+'&id='+str(player["person"]["id"])+' &statsArray='+str(FANTASY_SKATER_SCORES)+' "target="_blank">'+player["person"]["fullName"]+'</a>')
         fantasyScore=0
         counter = 0
         #i is the category name, category is the index for the statistic actual value
@@ -189,6 +237,8 @@ def check_viability(position):
 def get_all_players():
   teams = get_teams()
   all_players = list()
+  currentYear = datetime.datetime.now().year
+  enterYear = str(currentYear-1)+str(currentYear)
   #x is an array of teams and their stats
   for x in teams:
     api_url_base = 'https://statsapi.web.nhl.com/api/v1/teams/' + str(x["id"]) + '/roster'
@@ -199,7 +249,7 @@ def get_all_players():
     for i in teamData["roster"]:
       try:
         if check_viability(i["position"]["abbreviation"]):
-          currentPlayer = get_player_stats(i)
+          currentPlayer = get_player_stats(i, enterYear)
           all_players.append(currentPlayer)
       except IndexError:
         print("No stats for "+i["person"]["fullName"])
@@ -257,8 +307,6 @@ def return_player_data(playerID):
       returnString = returnString +'<th>'+ str(j) +'</th>'
   currentSeasonStats = get_season_scores(playerID, playerAge, currentYear, False)
   while playerAge>=18:
-    #print ("Getting data for "+str(currentYear-1)+"-"+str(currentYear))
-    #print ("The value for currentSeasonStats[1] is "+currentSeasonStats[1])
     print ("Generating stats for "+str(currentYear))
     returnString = returnString + '<tr>'
     for j in currentSeasonStats:
@@ -273,55 +321,43 @@ def minuteToDecimal(timeString):
   stringSplit = timeString.split(':')
   return int(stringSplit[0])+(int(stringSplit[1])/60)
 
-@app.route('/generate-chart/<int:playerID>')
-def makePlot(playerID):
+@app.route('/generate-chart/')
+def makePlot():
+  playerID = str(request.args.get('playerID', type = str))
   startTime = time.perf_counter()
-  horizontalAxis = list()
-  verticalAxis = list()
+  playerCharacteristics = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)).json()
   #These are the values as recieved
   horizontalInput = str(request.args.get('horizontal', type = str))
   verticalInput = str(request.args.get('vertical', type = str))
-  #The player's current age
-  playerCharacteristics = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)).json()
-  playerAge = playerCharacteristics["people"][0]["currentAge"]
-  currentYear = datetime.datetime.now().year
-  #Loop to get all the stats for all the years the player has been eligible to play in the league
-  while playerAge>=18:
-    try:
-      playerJSON = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)+"/stats?stats=statsSingleSeason&season="+str(currentYear-1)+str(currentYear)).json()
-      playerData = playerJSON['stats'][0]['splits'][0]['stat']
-      #Checking if the per game modifier has been checked off
-      if horizontalInput=='age':
-          horizontalAxis.insert(0,playerAge)
-      elif horizontalInput=='season':
-          horizontalAxis.insert(0,"'"+str(currentYear)[2:4])
-      elif str(request.args.get('xPerGame', type = str)) == 'True':
-        if 'imeOnIce' in horizontalInput:
-          horizontalAxis.insert(0,minuteToDecimal(playerData[horizontalInput+'PerGame']))
-        else:
-          horizontalAxis.insert(0,playerData[horizontalInput]/playerData['games'])
-      else:
-        if 'imeOnIce' in horizontalInput:
-          horizontalAxis.insert(0,minuteToDecimal(playerData[horizontalInput]))
-        else:
-          horizontalAxis.insert(0,playerData[horizontalInput])
-      
-      if str(request.args.get('yPerGame', type = str)) == 'True':
-        if 'imeOnIce' in verticalInput:
-          verticalAxis.insert(0,minuteToDecimal(playerData[verticalInput+'PerGame']))
-        else:
-          verticalAxis.insert(0,playerData[verticalInput]/playerData['games'])
-      else:
-        if 'imeOnIce' in verticalInput:
-          verticalAxis.insert(0,minuteToDecimal(playerData[verticalInput]))
-        else:
-          verticalAxis.insert(0,playerData[verticalInput])
-    except IndexError:
-      print("No stats for "+str(currentYear-1)+"-"+str(currentYear))
-    currentYear-=1
-    playerAge-=1
-  print ("The horizontal array is "+str(horizontalAxis))
-  print ("The vertical array is "+str(verticalAxis))
+  print("The vertical Input is "+verticalInput)
+  horizontalAxis = createPlotArray(playerID, horizontalInput, request.args.get('xPerGame', type = str))
+  verticalAxis = list()
+  fantasyGrid = list()
+  #Special section for fantasy scores
+  if (verticalInput)=='fantasyScore':
+    #statisticsArray is the name of the category, valueArray contains the values associated with each category
+    valuesArray = eval(request.args.get('statsArray', type = str))
+    print ("The valuesArray is "+str(valuesArray))
+    fantasyGrid = createFantasyGrid(playerID, valuesArray, request.args.get('yPerGame', type = str))
+    print("The fantasy grid looks like "+str(fantasyGrid))
+    score = 0
+    counter = 0
+    playerAge = playerCharacteristics["people"][0]["currentAge"]
+    while playerAge>=18:
+      try:
+        #This is an array of arrays
+        for i in fantasyGrid:
+          score = score+i[counter]
+          print("i[counter] is "+str(i[counter]))
+        verticalAxis.insert(0,score)
+        print ("Appended, resetting score")
+        score = 0
+      except IndexError:
+        print("No stats for age "+str(playerAge))
+      playerAge-=1
+      counter+=1
+  else:
+    verticalAxis = createPlotArray(playerID, verticalInput, request.args.get('yPerGame', type = str))
   #Give the axes proper names
   horizontalTitle = ''
   verticalTitle = ''
@@ -334,6 +370,8 @@ def makePlot(playerID):
     verticalTitle = verticalTitle + " in minutes"
   #Make the plots
   fig, ax = plt.subplots()
+  if str(request.args.get('sameGraph', type = str))=='True':
+    print ("You checked off sameGraph!")
   if (str(request.args.get('horizontal', type = str))=='age' or str(request.args.get('horizontal', type = str))=='season'):
     ax.plot(horizontalAxis, verticalAxis, linestyle='--', marker='o', color='r', label = 'Data')
   else:
@@ -347,10 +385,8 @@ def makePlot(playerID):
   ax.set_ylabel(verticalTitle)
   ax.set_title(playerCharacteristics["people"][0]["fullName"])  # Add a title to the graph.
   ax.legend()  # Add a legend.
-  if str(request.args.get('sameGraph', type = str))=='True':
-    print ("You checked off sameGraph!")
   if os.path.isfile('plots/currentChart.png') and str(request.args.get('sameGraph', type = str))!='True':
-    print("Deleting your files!")
+    print("Deleting previously found graph")
     os.remove('plots/currentChart.png') 
   plt.savefig('plots/currentChart.png')
   #full_filename = os.path.join(app.config['UPLOAD_FOLDER'], 'currentChart.png')
@@ -385,6 +421,7 @@ def player_link():
   startTime = time.perf_counter()
   print ("Fetching player data for "+request.args.get('fullName', type = str))
   playerID = request.args.get('id', type = str)
+  #Current issue: the value for str(request.args.get('statsArray', type = str)) doesn't pass over to the getCategories function
   playerString = "<style>"+getTableProperties()+getToolTip()+"</style><table align='center style='float:center'><h1 style='text-align:center;' >"+'<a href="https://www.nhl.com/player/'+str(playerID)+'"target="_blank">'+request.args.get('fullName', type = str)+'</a>'+"</h1><br><br><br><tr>"+return_player_data(playerID)+"</table>"+getCategories(playerID)
   endTime = time.perf_counter()
   print("Player's stats fetched in "+str(endTime-startTime)+" seconds.")
