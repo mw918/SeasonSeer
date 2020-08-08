@@ -61,12 +61,12 @@ def createPlotArray(playerID, categoryName, perGame):
     try:
       playerJSON = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)+"/stats?stats=statsSingleSeason&season="+str(currentYear-1)+str(currentYear)).json()
       playerData = playerJSON['stats'][0]['splits'][0]['stat']
-      #Checking if the per game modifier has been checked off
       if categoryName=='age':
           returnList.insert(0,playerAge)
       elif categoryName=='season':
           returnList.insert(0,"'"+str(currentYear)[2:4])
       elif perGame == 'True':
+        #Checking if the per game modifier has been checked off
         if 'imeOnIce' in categoryName:
           returnList.insert(0,minuteToDecimal(playerData[categoryName+'PerGame']))
         else:
@@ -105,16 +105,16 @@ def createFantasyGrid(playerID, weightsArray, perGame):
       if perGame == 'True':
         for i in categoryArray:
           if 'imeOnIce' in i:
-            returnList[counter].append(minuteToDecimal(playerData[i+'PerGame'])*weightsArray[counter])
+            returnList[counter].insert(0,minuteToDecimal(playerData[i+'PerGame'])*weightsArray[counter])
           else:
-            returnList[counter].append(playerData[i]/playerData['games']*weightsArray[counter])
+            returnList[counter].insert(0,playerData[i]/playerData['games']*weightsArray[counter])
           counter+=1
       else:
         for i in categoryArray:
           if 'imeOnIce' in i:
-            returnList[counter].append(minuteToDecimal(playerData[i])*weightsArray[counter])
+            returnList[counter].insert(0,minuteToDecimal(playerData[i])*weightsArray[counter])
           else:
-            returnList[counter].append(playerData[i]*weightsArray[counter])
+            returnList[counter].insert(0,playerData[i]*weightsArray[counter])
           counter+=1
     except IndexError:
       print("No stats for "+str(currentYear-1)+"-"+str(currentYear))
@@ -153,8 +153,6 @@ def getCategories(playerID):
   playerData = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)+"/stats?stats=statsSingleSeason&season="+str(currentYear-1)+str(currentYear)).json()
   playerStats = playerData['stats'][0]['splits'][0]['stat']
   #Top of the string
-  #Current issue: the statsArray doesn't make it over to the next page
-  #statsArray='+request.args.get('statsArray', type = str)+' &playerID='+playerID+'
   topString = '<form action="/generate-chart/" target="_blank" align="center"><div class="row"><div class="column"><h3>Horizontal axis</h3><select id="horizontal" name="horizontal">'
   middleString = '</select></div><div class="column"><h3>Vertical axis</h3><select id="vertical" name="vertical">'
   bottomString = '</select></div></div><br><input type="hidden" class="form-control" name="playerID" id="playerID" value="'+playerID+'"><input type="hidden" class="form-control" name="statsArray" id="statsArray" value="'+str(request.args.get('statsArray', type = str))+'"><input type="checkbox" id="xPerGame" name="xPerGame" value="True"><label for="xPerGame">Generate stats per game in horizontal</label><br><input type="checkbox" id="yPerGame" name="yPerGame" value="True"><label for="yPerGame">Generate stats per game in vertical</label><br><input type="checkbox" id="sameGraph" name="sameGraph" value="True"><label for="sameGraph">Generate output on same graph</label><br><br><input type="submit" value="Generate Chart"></form>'
@@ -175,7 +173,6 @@ def get_player_stats(player, year):
       playerData = playerResponse.json()
       #This variable is the list of all stats for one player
       playerStats = playerData['stats'][0]['splits'][0]['stat']
-      #currentPlayer.append('<a href="https://www.nhl.com/player/'+str(player["person"]["id"])+'"target="_blank">'+player["person"]["fullName"]+'</a>')
       
       currentPlayer.append(player["jerseyNumber"])
       currentPlayer.append(player["position"]["abbreviation"])
@@ -276,7 +273,6 @@ def return_players_last_season():
     headerString = headerString + "<th>Goals(Wins)</th><th>Assists(GA)</th><th>Points(SV)</th><th>PIM(SO)</th><th>PPP</th><th>SHP</th><th>SOG</th><th>HIT</th><th>BLK</th></tr>"
   else:
     headerString = headerString + "<th>Goals</th><th>Assists</th><th>Points</th><th>PIM</th><th>PPP</th><th>SHP</th><th>SOG</th><th>HIT</th><th>BLK</th></tr>"
-  #<th>GP</th><th>Goals</th><th>Assists</th><th>Points</th><th>PIM</th><th>PPP</th><th>SHP</th><th>SOG</th><th>HIT</th><th>BLK</th></tr>
   returnString = returnString + headerString
   #This goes through the entire list of players
   #i is an array of a player and their stats
@@ -333,13 +329,12 @@ def makePlot():
   horizontalAxis = createPlotArray(playerID, horizontalInput, request.args.get('xPerGame', type = str))
   verticalAxis = list()
   fantasyGrid = list()
+  categoryArray = list()
   #Special section for fantasy scores
   if (verticalInput)=='fantasyScore':
     #statisticsArray is the name of the category, valueArray contains the values associated with each category
     valuesArray = eval(request.args.get('statsArray', type = str))
-    print ("The valuesArray is "+str(valuesArray))
     fantasyGrid = createFantasyGrid(playerID, valuesArray, request.args.get('yPerGame', type = str))
-    print("The fantasy grid looks like "+str(fantasyGrid))
     score = 0
     counter = 0
     playerAge = playerCharacteristics["people"][0]["currentAge"]
@@ -348,9 +343,7 @@ def makePlot():
         #This is an array of arrays
         for i in fantasyGrid:
           score = score+i[counter]
-          print("i[counter] is "+str(i[counter]))
-        verticalAxis.insert(0,score)
-        print ("Appended, resetting score")
+        verticalAxis.append(score)
         score = 0
       except IndexError:
         print("No stats for age "+str(playerAge))
@@ -363,17 +356,26 @@ def makePlot():
   verticalTitle = ''
   horizontalTitle = returnWord(horizontalInput)
   verticalTitle = returnWord(verticalInput)
-
+  if playerCharacteristics["people"][0]["primaryPosition"]['abbreviation']=='G':
+    categoryArray = FANTASY_GOALIE_STATISTICS
+  else:
+    categoryArray = FANTASY_SKATER_STATISTICS
   if "imeOnIce" in horizontalInput:
     horizontalTitle = horizontalTitle + " in minutes"
   if "imeOnIce" in verticalInput:
     verticalTitle = verticalTitle + " in minutes"
+  counter = 0
   #Make the plots
   fig, ax = plt.subplots()
-  if str(request.args.get('sameGraph', type = str))=='True':
-    print ("You checked off sameGraph!")
   if (str(request.args.get('horizontal', type = str))=='age' or str(request.args.get('horizontal', type = str))=='season'):
-    ax.plot(horizontalAxis, verticalAxis, linestyle='--', marker='o', color='r', label = 'Data')
+    if str(request.args.get('sameGraph', type = str))=='True' and verticalInput=='fantasyScore':
+      #i is the name of the category
+      for i in categoryArray:
+        ax.plot(horizontalAxis, fantasyGrid[counter], linestyle='--', marker='o', label = returnWord(i))
+        counter+=1
+      ax.plot(horizontalAxis, verticalAxis, linestyle='--', marker='o', color='r', label = 'Fantasy score')
+    else:
+      ax.plot(horizontalAxis, verticalAxis, linestyle='--', marker='o', color='r', label = 'Data')
   else:
     ax.scatter(horizontalAxis, verticalAxis, c='#000000', s = 10, label = "Data", alpha=0.5, marker="+")
   #Labels for the axes
@@ -384,7 +386,7 @@ def makePlot():
   ax.set_xlabel(horizontalTitle)
   ax.set_ylabel(verticalTitle)
   ax.set_title(playerCharacteristics["people"][0]["fullName"])  # Add a title to the graph.
-  ax.legend()  # Add a legend.
+  ax.legend(loc='upper left')  # Add a legend.
   if os.path.isfile('plots/currentChart.png') and str(request.args.get('sameGraph', type = str))!='True':
     print("Deleting previously found graph")
     os.remove('plots/currentChart.png') 
