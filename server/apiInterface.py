@@ -423,7 +423,6 @@ def player_link():
   startTime = time.perf_counter()
   print ("Fetching player data for "+request.args.get('fullName', type = str))
   playerID = request.args.get('id', type = str)
-  #Current issue: the value for str(request.args.get('statsArray', type = str)) doesn't pass over to the getCategories function
   playerString = "<style>"+getTableProperties()+getToolTip()+"</style><table align='center style='float:center'><h1 style='text-align:center;' >"+'<a href="https://www.nhl.com/player/'+str(playerID)+'"target="_blank">'+request.args.get('fullName', type = str)+'</a>'+"</h1><br><br><br><tr>"+return_player_data(playerID)+"</table>"+getCategories(playerID)
   endTime = time.perf_counter()
   print("Player's stats fetched in "+str(endTime-startTime)+" seconds.")
@@ -433,7 +432,6 @@ def player_link():
 def my_link():
   startTime = time.perf_counter()
   getFantasyStatistics()
-  #return return_teams()
   fileNameString = "saves/"+str(datetime.datetime.now().year)+request.full_path.split("?")[1]
   seasonString =""
   #Load the saved file if it exists, to save time
