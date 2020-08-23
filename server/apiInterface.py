@@ -9,7 +9,9 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from flask import Flask, render_template, request
-from PIL import Image 
+from PIL import Image
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
 
 #PEOPLE_FOLDER = os.path.join('..\static', 'plots')
 app = Flask(__name__)
@@ -51,7 +53,7 @@ def returnAcronym(inputString):
 #playerID is the player's ID, categoryName is the statistical category the user asked for, and perGame is a check on whether or not they want it per game
 def createPlotArray(playerID, categoryName, perGame):
   returnList = list()
-  print("The categoryName is "+str(categoryName))
+  print("The category name is "+str(categoryName))
   playerCharacteristics = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)).json()
   #The player's current age
   playerAge = playerCharacteristics["people"][0]["currentAge"]
@@ -123,15 +125,46 @@ def createFantasyGrid(playerID, weightsArray, perGame):
   #This returns the points in fantasy the player has gotten in each category, going backwards in year
   return returnList
 
+#This function returns an array of all the fantasy scores of a player year after year from data that's available. 
+#I have age and fantasyGrid out here because the functions that call it already have them out as variables, or need them for later uses, so it saves time
+def getFantasyScores(playerID, playerAge, fantasyGrid):
+  returnArray = list()
+  score = 0
+  counter = 0
+  while playerAge>=18:
+    try:
+      #This is an array of arrays
+      for i in fantasyGrid:
+        score = score+i[counter]
+      #Score here is the fantasy score for that given season
+      returnArray.append(score)
+      score = 0
+    except IndexError:
+      print("No stats for age "+str(playerAge))
+    playerAge-=1
+    counter+=1
+  return returnArray
+
+#This one is like createFantasyGrid, but with a more simplistic way to call it. Only advised if you don't already have age and fantasyGrid on hand. 
+def bareBonesGetFantasyScore(playerID):
+  playerCharacteristics = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)).json()
+  playerAge = playerCharacteristics["people"][0]["currentAge"]
+  valuesArray = eval(request.args.get('statsArray', type = str))
+  fantasyGrid = createFantasyGrid(playerID, valuesArray, request.args.get('yPerGame', type = str))
+  return getFantasyScores(playerID, playerAge, fantasyGrid)
+
 #This function returns all data for a player in one given season
 def get_season_scores(playerID, age, season, getHeader):
   currentSeason = list()
   if getHeader:
     currentSeason.append("Season")
     currentSeason.append("Age")
+    currentSeason.append("Fantasy score")
   else:
     currentSeason.append(str(season-1)+"-"+str(season))
     currentSeason.append(str(age))
+    #Make sure to do the calculation for the fantasy score here
+    #currentSeason.append(str(fantasyScore))
   try:
     playerData = requests.get("https://statsapi.web.nhl.com/api/v1/people/"+str(playerID)+"/stats?stats=statsSingleSeason&season="+str(season-1)+str(season)).json()
     playerStats = playerData['stats'][0]['splits'][0]['stat']
@@ -292,6 +325,7 @@ def return_players_last_season():
   print(str(counter)+" players counted.")
   return returnString
 
+#The function to return all of the player's stats that are in the NHL API
 def return_player_data(playerID):
   currentYear = datetime.datetime.now().year
   returnString = ''
@@ -302,6 +336,7 @@ def return_player_data(playerID):
   for j in currentSeasonStats:
       returnString = returnString +'<th>'+ str(j) +'</th>'
   currentSeasonStats = get_season_scores(playerID, playerAge, currentYear, False)
+  #Go through their entire career until the counter is down to 18
   while playerAge>=18:
     print ("Generating stats for "+str(currentYear))
     returnString = returnString + '<tr>'
@@ -317,6 +352,12 @@ def minuteToDecimal(timeString):
   stringSplit = timeString.split(':')
   return int(stringSplit[0])+(int(stringSplit[1])/60)
 
+#XData should be all the player statistics, and YData should be the total fantasy points
+def createLinearRegression(XData, YData):
+  xTrain, xTest, yTrain, yTest = train_test_split(XData, YData, test_size=0.2, random_state=123)
+  linear_regression_model = LinearRegression()
+  linear_regression_model.fit(xTrain, yTrain)
+
 @app.route('/generate-chart/')
 def makePlot():
   playerID = str(request.args.get('playerID', type = str))
@@ -325,7 +366,7 @@ def makePlot():
   #These are the values as recieved
   horizontalInput = str(request.args.get('horizontal', type = str))
   verticalInput = str(request.args.get('vertical', type = str))
-  print("The vertical Input is "+verticalInput)
+  print("The vertical input is "+verticalInput)
   horizontalAxis = createPlotArray(playerID, horizontalInput, request.args.get('xPerGame', type = str))
   verticalAxis = list()
   fantasyGrid = list()
@@ -334,21 +375,9 @@ def makePlot():
   if (verticalInput)=='fantasyScore':
     #statisticsArray is the name of the category, valueArray contains the values associated with each category
     valuesArray = eval(request.args.get('statsArray', type = str))
-    fantasyGrid = createFantasyGrid(playerID, valuesArray, request.args.get('yPerGame', type = str))
-    score = 0
-    counter = 0
     playerAge = playerCharacteristics["people"][0]["currentAge"]
-    while playerAge>=18:
-      try:
-        #This is an array of arrays
-        for i in fantasyGrid:
-          score = score+i[counter]
-        verticalAxis.append(score)
-        score = 0
-      except IndexError:
-        print("No stats for age "+str(playerAge))
-      playerAge-=1
-      counter+=1
+    fantasyGrid = createFantasyGrid(playerID, valuesArray, request.args.get('yPerGame', type = str))
+    verticalAxis = getFantasyScores(playerID, playerAge, fantasyGrid)
   else:
     verticalAxis = createPlotArray(playerID, verticalInput, request.args.get('yPerGame', type = str))
   #Give the axes proper names
